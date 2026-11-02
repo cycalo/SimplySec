@@ -141,3 +141,23 @@ def get_category(interface_index: int) -> Profile | None:
         {"index": interface_index},
     )
     return CATEGORY_TO_PROFILE.get(int(data)) if data is not None else None
+
+
+_NEIGHBORS = r"""
+$rows = @(Get-NetNeighbor -AddressFamily IPv4 -InterfaceIndex ([int]$P.index) -ErrorAction SilentlyContinue |
+  Where-Object { [int]$_.State -ne 1 } |
+  ForEach-Object { [ordered]@{ ip = $_.IPAddress; mac = $_.LinkLayerAddress; state = [int]$_.State } })
+ConvertTo-Json -InputObject $rows -Compress
+"""
+
+
+def neighbors(interface_index: int) -> dict[str, str]:
+    """IPv4 neighbour (ARP) table for one interface: ip -> MAC, skipping unreachable entries."""
+    data = runner.powershell_json(_NEIGHBORS, {"index": int(interface_index)})
+    out: dict[str, str] = {}
+    for n in as_list(data):
+        mac = str(n.get("mac") or "").replace("-", ":").upper()
+        if not mac or mac in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"):
+            continue
+        out[str(n.get("ip"))] = mac
+    return out

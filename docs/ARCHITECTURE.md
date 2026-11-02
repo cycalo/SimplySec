@@ -156,6 +156,33 @@ plain-language text, fixes and allow-lists. Facts that couldn't be read produce 
 ("reported as unknown, not as safe"). Settings controlled by Group Policy or a domain are
 reported as *Managed* and never changed.
 
+## Home network, router and Wi-Fi (`core/lan`, `core/router`, `windows/wifi.py`)
+
+* **Scope.** The IPv4 subnet of each up Ethernet/Wi-Fi interface with a private address, from its
+  netmask, capped at /22 around this PC. VPN and virtual adapters are never scanned.
+* **Consent.** Before the first scan of a network SimplySec asks "Is this your network?" and
+  remembers the answer by network name + subnet (Settings > Networks I own). Nothing is scanned
+  otherwise. Other devices only ever get guidance; SimplySec changes nothing on them.
+* **Discovery.** Async TCP connects to every address on a few common ports (any answer, even a
+  refusal, proves a host and fills the ARP cache), then `Get-NetNeighbor` for MAC addresses.
+* **Identity.** Bundled IEEE OUI list (`resources/oui.csv.gz`, rebuilt by
+  `scripts/refresh_oui.py`; nmap's `nmap-mac-prefixes` as fallback), randomized-MAC detection
+  (locally administered bit: "private address, likely a phone"), reverse DNS, SSDP friendly and
+  model names.
+* **Services.** Async connects on the ~45 ports marked `lan_probe = true` in `ports.toml`;
+  optional `nmap -sV` deep scan when nmap is installed (never bundled).
+* **Inventory.** Devices are stored by MAC in the per-user history DB with first/last seen,
+  label and a trusted flag. New devices are flagged from the second network scan on.
+* **Router.** SSDP finds the Internet Gateway Device; SOAP `GetExternalIPAddress` and
+  `GetGenericPortMappingEntry` (≤ 256 entries, stop at fault 713). Read-only. defusedxml (DTDs
+  and entities rejected), 256 KB cap, plain-http URLs on the scanned subnet only, no redirects.
+  Findings: forward to this PC (Critical unless kept), forward to another device (High), UPnP on
+  (Low), CGNAT/private WAN address (Info).
+* **Wi-Fi.** `netsh wlan export profile` without `key=clear`; only name, SSID, connection mode,
+  authentication and encryption are read and the export folder is deleted at once. Open, WEP,
+  TKIP or WPA networks that auto-connect are Medium (fix: `wifi.connection_mode` = manual, undoable);
+  being connected to one right now is High.
+
 ## Knowledge base
 
 `core/knowledge/ports.toml`, `programs.toml` and `services.toml` are the single source of truth

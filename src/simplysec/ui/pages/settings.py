@@ -34,6 +34,9 @@ class SettingsPage(Page):
         self.extra = QVBoxLayout()
         self.body.addLayout(self.extra)
 
+        nets_card, self.nets_layout = card()
+        self.body.addWidget(nets_card)
+
         acc_card, self.acc_layout = card()
         self.body.addWidget(acc_card)
 
@@ -67,6 +70,7 @@ class SettingsPage(Page):
         )
         self.restart.setVisible(not admin)
 
+        self._fill_networks()
         self.clear(self.acc_layout)
         self.acc_layout.addWidget(label("Accepted risks (Keep)", object_name="SectionTitle"))
         try:
@@ -94,6 +98,34 @@ class SettingsPage(Page):
             b.clicked.connect(lambda _=False, k=a["keep_key"]: self.ctl.unkeep(k))
             r.addWidget(b)
             self.acc_layout.addLayout(r)
+
+    def _fill_networks(self) -> None:
+        from ...core import lan
+
+        self.clear(self.nets_layout)
+        self.nets_layout.addWidget(label("Networks I own", object_name="SectionTitle"))
+        nets = lan.owned_networks(self.ctl.engine.history)
+        if not nets:
+            self.nets_layout.addWidget(
+                label(
+                    "None yet. SimplySec asks before it scans a network for devices.",
+                    object_name="Dim",
+                )
+            )
+        for key, info in nets.items():
+            r = QHBoxLayout()
+            confirmed = str(info.get("confirmed", ""))[:10]
+            text = f"{html.escape(info.get('label', key))}<br><span style='font-size:9pt'>confirmed {confirmed}</span>"
+            r.addWidget(label(text, rich=True), 1)
+            b = QPushButton("Forget")
+            b.clicked.connect(
+                lambda _=False, k=key: (
+                    lan.forget_network(self.ctl.engine.history, k),
+                    self.refresh(),
+                )
+            )
+            r.addWidget(b)
+            self.nets_layout.addLayout(r)
 
     def _restart(self) -> None:
         if elevation.relaunch_elevated([], gui=True):

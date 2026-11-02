@@ -23,6 +23,9 @@ change by reading it back, and can undo everything it did.
 | Updates | Last update too long ago, updates paused, restart pending |
 | Accounts | UAC off, Guest enabled, blank-password network logons |
 | System | AutoRun, BitLocker |
+| Wi-Fi | Saved open/WEP/TKIP networks that connect automatically; connected to an open network now |
+| Home network | Devices on networks you confirm are yours (vendor, name, risky services such as Telnet or an open Docker API), new devices |
+| Router | UPnP on, port forwards to this PC or other devices, CGNAT |
 | Housekeeping | Rules left behind by SimpleSec v1, managed (domain / Group Policy) PCs |
 
 ## Install and run from source
@@ -41,6 +44,7 @@ py -3.11 -m venv .venv
 ```
 simplysec                                   start the GUI
 simplysec scan [--json]                     read-only scan
+simplysec scan --network [--deep]           also scan your home network (asks "Is this your network?")
 simplysec fix recommended                   safe, non-disruptive fixes (preview + confirm)
 simplysec fix --finding ID --fix FIX_ID     one fix; add --mark-private, --restore-point, --elevate
 simplysec keep --finding ID [--undo]        accept a risk ("Keep: I need this")

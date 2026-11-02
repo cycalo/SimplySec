@@ -16,6 +16,7 @@ from . import (
     sharing,
     system,
     updates,
+    wifi,
 )
 from .base import Allow, Check, FixDef
 
@@ -29,6 +30,7 @@ CHECKS: list[Check] = [
     updates.CHECK_DEF,
     accounts.CHECK_DEF,
     system.CHECK_DEF,
+    wifi.CHECK_DEF,
     housekeeping.CHECK_DEF,
 ]
 

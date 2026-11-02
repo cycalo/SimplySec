@@ -88,6 +88,35 @@ class Controller(QObject):
             on_finished=lambda: self._set_busy(False),
         )
 
+    def scan_network(self, targets: list[Any], deep: bool = False) -> None:
+        """Scan confirmed home networks and merge the devices into the current result."""
+        if self.busy or self.result is None:
+            return
+        self._set_busy(True, "Scanning your network…")
+        current = self.result
+
+        def work(progress: Any) -> ScanResult:
+            from ..core import lan
+
+            lan.scan_network(self.engine, current, targets, progress=progress, deep=deep)
+            try:
+                self.engine.history.save_scan(current, kind="network")
+            except Exception as exc:
+                log.warning("could not save network scan: %s", exc)
+            return current
+
+        def done(res: ScanResult) -> None:
+            self.result = res
+            self.scan_finished.emit(res)
+
+        run_in_background(
+            work,
+            on_result=done,
+            on_error=lambda e: self.error.emit(f"The network scan failed: {e}"),
+            on_progress=self.progress.emit,
+            on_finished=lambda: self._set_busy(False),
+        )
+
     # ----------------------------------------------------------------- keep
     def keep(self, finding: Finding) -> None:
         if not finding.keep_key:

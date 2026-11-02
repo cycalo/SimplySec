@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<s:Body><u:GetGenericPortMappingEntryResponse xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1">
+<NewRemoteHost></NewRemoteHost><NewExternalPort>3074</NewExternalPort><NewProtocol>UDP</NewProtocol>
+<NewInternalPort>3074</NewInternalPort><NewInternalClient>192.168.1.40</NewInternalClient>
+<NewEnabled>1</NewEnabled><NewPortMappingDescription>Xbox</NewPortMappingDescription><NewLeaseDuration>3600</NewLeaseDuration>
+</u:GetGenericPortMappingEntryResponse></s:Body></s:Envelope>

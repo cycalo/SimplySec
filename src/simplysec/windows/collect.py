@@ -78,6 +78,21 @@ def _facts() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _wifi() -> dict[str, Any]:
+    """Saved Wi-Fi profiles as a fact item (names, modes and security only; never keys)."""
+    from . import wifi
+
+    try:
+        items = []
+        for p in wifi.profiles():
+            d = p.to_dict()
+            d["weak"] = p.weak
+            items.append(d)
+        return {"status": "ok", "value": items}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
 def collect(progress: Callable[[str], None] | None = None) -> RawScan:
     started = time.monotonic()
     stamp = dt.datetime.now().astimezone().isoformat(timespec="seconds")
@@ -122,6 +137,7 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
                     exes.add(app)
         say("Checking program signatures…")
         f_sigs = pool.submit(listeners.signatures, sorted(exes))
+        f_wifi = pool.submit(_wifi)
 
         try:
             facts = f_facts.result()
@@ -129,6 +145,7 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
             log.exception("facts.ps1 failed")
             errors.append(f"could not read Windows settings: {exc}")
             facts = {}
+        facts["wifi"] = f_wifi.result()
         try:
             sigs = {k: SignatureInfo(v.status, v.publisher) for k, v in f_sigs.result().items()}
         except Exception as exc:

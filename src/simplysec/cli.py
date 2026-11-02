@@ -1,7 +1,7 @@
 """Command-line interface.
 
 simplysec                      start the GUI
-simplysec scan [--json]
+simplysec scan [--json] [--network [--deep] [--yes]]
 simplysec fix recommended | --finding ID --fix FIX_ID | --select ID=FIX ...  [--yes]
 simplysec keep --finding ID
 simplysec undo --change N | --batch N | --all | --rules  [--yes]
@@ -74,6 +74,21 @@ def _print_scan(result: Any) -> None:
         _out(
             f"  {p.protocol.upper():<4}{p.port:<6} {p.process[:24]:<24} {p.risk.label:<8} {p.reachable_from}"
         )
+    devices = result.extras.get("devices") or []
+    if devices:
+        _out()
+        _out(f"Devices on your network ({len(devices)}):")
+        for d in devices:
+            name = d.get("name") or (f"{d['vendor']} device" if d.get("vendor") else "unknown")
+            ports = ",".join(map(str, d.get("open_ports", [])))
+            _out(f"  {d['ip']:<15} {d.get('mac', ''):<17} {name[:40]:<40} {ports}")
+    router = result.extras.get("router") or {}
+    if router:
+        state = "UPnP on" if router.get("found") else "UPnP not found"
+        forwards = len(router.get("mappings", []))
+        _out(
+            f"Router: {state}; external IP {router.get('external_ip') or '?'}; {forwards} port forward(s)"
+        )
     if result.errors:
         _out()
         _out("Problems while scanning:")
@@ -81,9 +96,45 @@ def _print_scan(result: Any) -> None:
             _out(f"  {e}")
 
 
+def _confirm_networks(engine: Any, result: Any, assume_yes: bool) -> list[Any]:
+    """Ask "Is this your network?" for each scannable network; remember the answer."""
+    from .core import lan
+
+    targets = lan.scan_targets(result.interfaces)
+    if not targets:
+        print(
+            "No home network to scan (only VPN, virtual or public-address adapters).",
+            file=sys.stderr,
+        )
+    for t in targets:
+        if lan.is_owned(engine.history, t):
+            continue
+        print(
+            f"Is {t.label} your network? SimplySec will look for devices on it and check which "
+            "services they offer. Only scan networks you own or manage.",
+            file=sys.stderr,
+        )
+        if assume_yes or _confirm("This is my network, scan it", False):
+            lan.set_owned(engine.history, t, True)
+    return [t for t in targets if lan.is_owned(engine.history, t)]
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     engine = _engine()
-    result = engine.scan(progress=None if args.json else _progress, save=not args.no_save)
+    progress = None if args.json else _progress
+    result = engine.scan(progress=progress, save=not args.no_save and not args.network)
+    if args.network:
+        from .core import lan
+
+        targets = _confirm_networks(engine, result, args.yes)
+        if targets:
+            try:
+                lan.scan_network(engine, result, targets, progress=progress, deep=args.deep)
+            except Exception as exc:
+                log.exception("network scan failed")
+                result.errors.append(f"home-network scan failed: {exc}")
+        if not args.no_save:
+            engine.history.save_scan(result, kind="network")
     if args.json:
         json.dump(result.to_dict(include_facts=args.facts), sys.stdout, indent=2, default=str)
         sys.stdout.write("\n")
@@ -341,6 +392,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true", help="machine-readable output")
     s.add_argument("--facts", action="store_true", help="include raw facts in JSON")
     s.add_argument("--no-save", action="store_true", help="don't add to history")
+    s.add_argument(
+        "--network", action="store_true", help="also scan your home network (asks first)"
+    )
+    s.add_argument(
+        "--deep", action="store_true", help="with --network: nmap -sV if nmap is installed"
+    )
+    s.add_argument("--yes", action="store_true", help="answer yes to 'Is this your network?'")
     s.set_defaults(func=cmd_scan)
 
     f = sub.add_parser("fix", help="apply a fix (administrator)")

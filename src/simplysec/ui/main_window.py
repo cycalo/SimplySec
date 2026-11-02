@@ -103,7 +103,9 @@ class MainWindow(QMainWindow):
         )
 
     def extend_pages(self) -> None:
-        """Hook for pages added by later milestones (My network, History)."""
+        from .pages.network import NetworkPage
+
+        self.add_page("My network", NetworkPage(self.ctl))
 
     def add_page(self, name: str, page: QWidget) -> None:
         self.pages[name] = page
