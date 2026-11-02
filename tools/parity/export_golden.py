@@ -1075,7 +1075,55 @@ def main() -> None:
     export_primitives()
     export_exposure()
     export_analysis()
+    export_compat()
     print("done")
+
+
+
+# --------------------------------------------------------------------------- compatibility
+
+
+def export_compat() -> None:
+    """A journal and a history written by Python v2, for the C# compatibility tests."""
+    import shutil
+    import tempfile
+
+    from simplysec.core.history import History
+    from simplysec.core.journal import Journal
+    from tests.unit.test_engine_undo import FakeFirewall, FakeRegistry, FakeSystem
+    from simplysec.core.actions import Adapters
+
+    out = OUT / "compat"
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    tmp = Path(tempfile.mkdtemp())
+    adapters = Adapters(FakeFirewall(), FakeRegistry(), None, None, FakeSystem(), None)
+    adapters.registry.values[(r"HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance", "fAllowToGetHelp")] = ("REG_DWORD", 1)
+    engine = Engine(
+        adapters=adapters,
+        journal=Journal(tmp / "simplysec.db"),
+        history=History(tmp / "history.db"),
+        is_admin=lambda: True,
+        backups_dir=tmp,
+    )
+    plan = build_plan(
+        [
+            Selection("rdp.remote_assistance_off", {}, "rdp.remote_assistance_on"),
+            Selection("exposure.block_program", {"exe": r"C:\t\a.exe", "label": "A"}, "x"),
+            Selection("legacy.smb1_off", {}, "legacy.smb1_on"),
+        ]
+    )
+    engine.apply(plan)
+    raw = load_raw()
+    result, _ = analyze_with_context(raw, file_exists=file_exists)
+    engine.history.save_scan(result, kind="manual")
+    engine.history.accept("keep:exposure.program:spotifylauncher.exe", 5, "Spotify")
+    engine.history.set_setting("daily_check", {"enabled": True, "time": "07:30"})
+    engine.history.upsert_device("AA:BB:CC:00:00:01", "192.168.1.5", "tv", "LG", {"open_ports": [8008], "model": "OLED"})
+    shutil.copy(tmp / "simplysec.db", out / "journal.db")
+    shutil.copy(tmp / "history.db", out / "history.db")
+    write("compat/expected", {"scan": result.to_dict(include_facts=False), "fw_rules": [r.to_dict() for r in adapters.firewall.rules]})
 
 
 if __name__ == "__main__":

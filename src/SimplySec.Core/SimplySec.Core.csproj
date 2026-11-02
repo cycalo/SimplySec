@@ -7,7 +7,6 @@
   <ItemGroup>
     <PackageReference Include="Tomlyn" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
-    <PackageReference Include="Fluid.Core" />
   </ItemGroup>
   <ItemGroup>
     <!-- Single source of truth during the port: the Python v2 knowledge base and resources. -->
