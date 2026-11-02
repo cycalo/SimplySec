@@ -30,9 +30,10 @@ def test_quiet_when_nothing_changed():
     assert monitor.triggers(s, s) == []
 
 
-def test_score_drop_of_five():
-    assert monitor.triggers(_scan(80), _scan(76)) == []
-    assert "dropped from 80 to 75" in monitor.triggers(_scan(80), _scan(75))[0]
+def test_risk_rise_of_five():
+    assert monitor.triggers(_scan(20), _scan(24)) == []
+    assert monitor.triggers(_scan(20), _scan(10)) == []  # lower risk: quiet
+    assert "rose from 20 to 25" in monitor.triggers(_scan(20), _scan(25))[0]
 
 
 def test_new_high_or_critical_only():
@@ -150,15 +151,15 @@ def test_monitor_run_saves_and_notifies(tmp_path, this_pc_raw):
     assert monitor.run_once(eng, notify=lambda title, lines: shown.append((title, lines))) == 0
     assert eng.history.scans()[0].kind == "monitor"
     assert shown == []  # first run on a PC with no protection gaps: quiet
-    # Make the stored previous scan look much better, so the score "drops".
+    # Make the stored previous scan look much better, so the risk score "rises".
     data = analyze(this_pc_raw).to_dict(include_facts=False)
-    data["score"] = 100
+    data["score"] = 0
     import json
     import sqlite3
 
     db = sqlite3.connect(eng.history.path)
-    db.execute("UPDATE scans SET data=?, score=100", (json.dumps(data),))
+    db.execute("UPDATE scans SET data=?, score=0", (json.dumps(data),))
     db.commit()
     db.close()
     monitor.run_once(eng, notify=lambda title, lines: shown.append((title, lines)))
-    assert shown and "dropped from 100" in shown[0][1][0]
+    assert shown and "rose from 0" in shown[0][1][0]

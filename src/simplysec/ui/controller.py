@@ -9,7 +9,6 @@ re-checks every action against the allow-lists. Results are then read from the j
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal
@@ -42,7 +41,6 @@ class Controller(QObject):
         self.previous: dict[str, Any] | None = None
         self.busy = False
         self.task_steps = 0
-        self.task_typical: float | None = None
         self._history_warned = False
 
     # ----------------------------------------------------------------- state
@@ -53,27 +51,11 @@ class Controller(QObject):
     def journal(self) -> Journal:
         return Journal(paths.journal_path(), readonly=not self.is_admin)
 
-    def _set_busy(
-        self, busy: bool, text: str = "", steps: int = 0, typical: float | None = None
-    ) -> None:
-        """``steps``/``typical`` describe the task for the progress panel (0: unknown)."""
+    def _set_busy(self, busy: bool, text: str = "", steps: int = 0) -> None:
+        """``steps`` is the number of steps for the progress panel (0: unknown)."""
         self.busy = busy
-        self.task_steps, self.task_typical = steps, typical
+        self.task_steps = steps
         self.busy_changed.emit(busy, text)
-
-    def _typical(self, key: str, default: float) -> float:
-        """How long this task took last time on this PC (or a typical default)."""
-        try:
-            value = self.engine.history.get_setting(key)
-        except Exception:
-            value = None
-        return float(value) if value else default
-
-    def _remember_duration(self, key: str, started: float) -> None:
-        try:
-            self.engine.history.set_setting(key, round(time.monotonic() - started, 1))
-        except Exception as exc:
-            log.debug("could not store duration: %s", exc)
 
     def comparison(self) -> Any:
         if self.result is None:
@@ -84,10 +66,7 @@ class Controller(QObject):
     def start_scan(self, then: Any = None) -> None:
         if self.busy:
             return
-        self._set_busy(
-            True, "Scanning this PC…", SCAN_STEPS, self._typical("last_scan_seconds", 15)
-        )
-        started = time.monotonic()
+        self._set_busy(True, "Scanning this PC…", SCAN_STEPS)
 
         def work(progress: Any) -> tuple[ScanResult, dict[str, Any] | None]:
             prev = None
@@ -96,9 +75,7 @@ class Controller(QObject):
                 prev = latest[0] if latest else None
             except Exception as exc:
                 log.warning("history unavailable: %s", exc)
-            res = self.engine.scan(progress=progress)
-            self._remember_duration("last_scan_seconds", started)
-            return res, prev
+            return self.engine.scan(progress=progress), prev
 
         def done(value: tuple[ScanResult, dict[str, Any] | None]) -> None:
             self.result, self.previous = value
@@ -118,21 +95,13 @@ class Controller(QObject):
         """Scan confirmed home networks and merge the devices into the current result."""
         if self.busy or self.result is None:
             return
-        self._set_busy(
-            True,
-            "Scanning your network…",
-            NETWORK_STEPS_PER_TARGET * len(targets),
-            self._typical("last_network_scan_seconds", 40),
-        )
+        self._set_busy(True, "Scanning your network…", NETWORK_STEPS_PER_TARGET * len(targets))
         current = self.result
-        started = time.monotonic()
 
         def work(progress: Any) -> ScanResult:
             from ..core import lan
 
             lan.scan_network(self.engine, current, targets, progress=progress, deep=deep)
-            if not deep:
-                self._remember_duration("last_network_scan_seconds", started)
             try:
                 self.engine.history.save_scan(current, kind="network")
             except Exception as exc:

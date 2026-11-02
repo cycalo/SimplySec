@@ -1,4 +1,4 @@
-"""What SimplySec is doing right now: steps done, current step, elapsed time, usual duration.
+"""What SimplySec is doing right now: steps done, current step, elapsed time.
 
 Shown at the top of every page while a scan, fix or undo runs, so it's always clear the app
 is working and not stuck.
@@ -14,8 +14,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QVBoxLa
 
 from ...core.progress import DONE, is_done
 
-SLOW_FACTOR = 3  # "taking longer than usual" after 3x the usual time
-SLOW_MIN_SECONDS = 45
+STALL_SECONDS = 150  # a step with no news for this long gets a "still working" note
 
 
 class ProgressPanel(QFrame):
@@ -53,13 +52,12 @@ class ProgressPanel(QFrame):
         self.timer.timeout.connect(self._tick)
         self.hide()
         self._started = 0.0
-        self._typical: float | None = None
+        self._last_update = 0.0
         self._total = 0
         self._done: list[str] = []
 
-    def start(self, title: str, total_steps: int = 0, typical_seconds: float | None = None) -> None:
-        self._started = time.monotonic()
-        self._typical = typical_seconds
+    def start(self, title: str, total_steps: int = 0) -> None:
+        self._started = self._last_update = time.monotonic()
         self._total = total_steps
         self._done = []
         self.title.setText(title)
@@ -78,6 +76,8 @@ class ProgressPanel(QFrame):
     def update_text(self, text: str) -> None:
         if not self.isVisible():
             return
+        self._last_update = time.monotonic()
+        self.warning.setText("")
         if is_done(text):
             self._done.append(text[len(DONE) :])
             if self._total:
@@ -92,18 +92,13 @@ class ProgressPanel(QFrame):
         self.hide()
 
     def _tick(self) -> None:
-        elapsed = time.monotonic() - self._started
+        now = time.monotonic()
         steps = (
             f"step {min(len(self._done) + 1, self._total)} of {self._total} · "
             if self._total
             else ""
         )
-        usual = f" · usually about {self._typical:.0f} s" if self._typical else ""
-        self.clock.setText(f"{steps}{elapsed:.0f} s elapsed{usual}")
-        limit = max(SLOW_MIN_SECONDS, (self._typical or 20) * SLOW_FACTOR)
-        if elapsed > limit:
-            self.warning.setText(
-                "This is taking longer than usual. Windows can be slow to answer right after "
-                "start-up or during updates. SimplySec gives up on any part after 3 minutes and "
-                "reports what it couldn't read, so it will finish."
-            )
+        self.clock.setText(f"{steps}{now - self._started:.0f} s elapsed")
+        # Only say something when one step has shown no progress for a long time.
+        if now - self._last_update > STALL_SECONDS:
+            self.warning.setText("Still working on this step. It will finish on its own.")

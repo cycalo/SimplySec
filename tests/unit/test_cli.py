@@ -66,7 +66,7 @@ def test_scan_json_shape(fake_engine, capsys):
 def test_scan_text(fake_engine, capsys):
     assert cli.main(["scan", "--no-save"]) == 0
     out = capsys.readouterr().out
-    assert "Score" in out and "Ports other devices can reach" in out
+    assert "Risk score" in out and "Ports other devices can reach" in out
 
 
 def test_fix_needs_admin(fake_engine, monkeypatch, capsys):

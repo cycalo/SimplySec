@@ -27,11 +27,11 @@ from . import Page
 class HistoryPage(Page):
     def __init__(self, ctl: Controller) -> None:
         super().__init__(
-            "History", "How this PC's score changed over time, and what each scan found."
+            "History", "How this PC's risk score changed over time, and what each scan found."
         )
         self.ctl = ctl
         chart_card, cl = card()
-        cl.addWidget(label("Score over time", object_name="SectionTitle"))
+        cl.addWidget(label("Risk score over time (lower is better)", object_name="SectionTitle"))
         self.chart = TrendChart()
         cl.addWidget(self.chart)
         self.body.addWidget(chart_card)
@@ -45,7 +45,7 @@ class HistoryPage(Page):
         self.body.addLayout(row)
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Scan", "Type", "Score", "Change"])
+        self.tree.setHeaderLabels(["Scan", "Type", "Risk score", "Change"])
         self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tree.setMinimumHeight(220)
         self.tree.currentItemChanged.connect(lambda cur, _prev: self._show(cur))
@@ -88,7 +88,7 @@ class HistoryPage(Page):
         diff = compare(history.previous_to(scan_id), data)
         self.detail.addWidget(
             label(
-                f"Scan of {html.escape(item.text(0))}: score {data.get('score')} ({data.get('grade')})",
+                f"Scan of {html.escape(item.text(0))}: risk score {data.get('score')} ({data.get('grade')})",
                 object_name="SectionTitle",
             )
         )

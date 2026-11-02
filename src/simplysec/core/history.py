@@ -68,7 +68,7 @@ class ScanSummary:
 
 @dataclass
 class Comparison:
-    score_change: int = 0
+    score_change: int = 0  # risk score change: positive means riskier
     new_findings: list[dict[str, Any]] = field(default_factory=list)
     resolved_findings: list[dict[str, Any]] = field(default_factory=list)
     new_listeners: list[str] = field(default_factory=list)
@@ -139,6 +139,30 @@ class History:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as db, db:
             db.executescript(SCHEMA)
+        self._migrate_score_scale()
+
+    def _migrate_score_scale(self) -> None:
+        """Scans saved before the risk score (100 = clean) get 100 - old, so trends stay valid."""
+        if self.get_setting("score_scale") == "risk":
+            return
+        from .models import Finding
+        from .scoring import grade
+
+        with closing(self._connect()) as db, db:
+            for row in db.execute("SELECT id, score, data FROM scans").fetchall():
+                new = 100 - int(row["score"])
+                data = json.loads(row["data"])
+                try:
+                    findings = [Finding.from_dict(f) for f in data.get("findings", [])]
+                except (KeyError, ValueError):
+                    findings = []
+                letter = grade(new, findings)
+                data["score"], data["grade"] = new, letter
+                db.execute(
+                    "UPDATE scans SET score=?, grade=?, data=? WHERE id=?",
+                    (new, letter, json.dumps(data), row["id"]),
+                )
+        self.set_setting("score_scale", "risk")
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path)

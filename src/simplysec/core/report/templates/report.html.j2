@@ -39,7 +39,7 @@
   <div class="card summary">
     <div class="grade">{{ result.grade }}</div>
     <div>
-      <div style="font-size:20px; font-weight:600">Score {{ result.score }}/100</div>
+      <div style="font-size:20px; font-weight:600">Risk score {{ result.score }}/100 <span class="dim" style="font-size:13px; font-weight:400">(lower is better)</span></div>
       <div class="counts">
         <span style="color:var(--critical)">{{ counts.critical }} critical</span>
         <span style="color:var(--high)">{{ counts.high }} high</span>
@@ -50,9 +50,9 @@
     </div>
     {% if trend|length > 1 %}
     <div>
-      <div class="dim">Score over time</div>
+      <div class="dim">Risk score over time</div>
       {% set w = 260 %}{% set h = 70 %}{% set n = trend|length %}
-      <svg width="{{ w }}" height="{{ h }}" viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Score trend">
+      <svg width="{{ w }}" height="{{ h }}" viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Risk score trend">
         <polyline fill="none" stroke="#0067c0" stroke-width="2"
           points="{% for d, s in trend %}{{ (loop.index0 * (w - 10) / (n - 1) + 5)|round(1) }},{{ (h - 5 - s * (h - 10) / 100)|round(1) }} {% endfor %}"/>
       </svg>

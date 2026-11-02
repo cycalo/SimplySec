@@ -53,6 +53,6 @@ class ScoreRing(QWidget):
         p.drawText(
             bottom,
             Qt.AlignmentFlag.AlignCenter,
-            f"{self.score}/100" if self.score is not None else "not scanned",
+            f"risk {self.score}/100" if self.score is not None else "not scanned",
         )
         p.end()

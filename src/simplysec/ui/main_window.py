@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
 
     def _busy(self, busy: bool, text: str) -> None:
         if busy:
-            self.progress.start(text or "Working…", self.ctl.task_steps, self.ctl.task_typical)
+            self.progress.start(text or "Working…", self.ctl.task_steps)
             self.status.setText(text)
         else:
             self.progress.finish()

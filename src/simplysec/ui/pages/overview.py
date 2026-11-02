@@ -152,7 +152,7 @@ class OverviewPage(Page):
         if diff.score_change:
             self.changes_layout.addWidget(
                 label(
-                    f"Score {'up' if diff.score_change > 0 else 'down'} by {abs(diff.score_change)}."
+                    f"Risk score {'up' if diff.score_change > 0 else 'down'} by {abs(diff.score_change)}."
                 )
             )
         for f in diff.new_findings:

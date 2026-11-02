@@ -1,4 +1,4 @@
-"""Score-over-time line chart drawn with QPainter (no QtCharts dependency)."""
+"""Risk-score-over-time line chart drawn with QPainter (no QtCharts dependency)."""
 
 from __future__ import annotations
 

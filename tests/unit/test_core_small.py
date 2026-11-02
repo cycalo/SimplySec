@@ -7,7 +7,7 @@ import ipaddress
 from simplysec.core.addrset import AddrSet, parse_literal
 from simplysec.core.checks.exposure import is_user_writable, user_configured
 from simplysec.core.engine import ScanResult, analyze
-from simplysec.core.history import History, compare
+from simplysec.core.history import SCHEMA, History, compare
 from simplysec.core.knowledge import load
 from simplysec.core.models import Finding, FindingStatus, Severity
 from simplysec.core.scoring import (
@@ -71,13 +71,40 @@ def _f(sev, status=FindingStatus.OPEN):
 
 
 def test_score_and_grade():
-    assert score([]) == 100
+    assert score([]) == 0
     assert (
         score([_f(Severity.CRITICAL), _f(Severity.HIGH), _f(Severity.MEDIUM), _f(Severity.LOW)])
-        == 100 - 25 - 12 - 5 - 2
+        == 25 + 12 + 5 + 2
     )
-    assert score([_f(Severity.HIGH, FindingStatus.ACCEPTED), _f(Severity.INFO)]) == 100
-    assert [grade(v) for v in (95, 85, 75, 65, 55, 10)] == ["A", "B", "C", "D", "E", "F"]
+    assert score([_f(Severity.HIGH, FindingStatus.ACCEPTED), _f(Severity.INFO)]) == 0
+    assert score([_f(Severity.CRITICAL)] * 5) == 100  # capped
+    assert [grade(v) for v in (5, 15, 25, 45, 65, 90)] == ["A", "B", "C", "D", "E", "F"]
+    assert [grade(v) for v in (9, 10, 31, 34, 35)] == ["A", "B", "C", "C", "D"]
+    # One serious finding caps the grade however low the score is.
+    assert grade(25, [_f(Severity.CRITICAL)]) == "D"
+    assert grade(12, [_f(Severity.HIGH)]) == "C"
+    assert grade(60, [_f(Severity.HIGH)]) == "E"  # never improves a worse grade
+    assert grade(12, [_f(Severity.HIGH, FindingStatus.ACCEPTED)]) == "B"
+
+
+def test_old_scans_are_converted_to_risk_scale(tmp_path):
+    import json
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path)
+    db.executescript(SCHEMA)
+    db.execute(
+        "INSERT INTO scans(ts, kind, score, grade, data) VALUES ('t', 'manual', 60, 'D', ?)",
+        (json.dumps({"score": 60, "grade": "D"}),),
+    )
+    db.commit()
+    db.close()
+    h = History(path)
+    assert (h.scans()[0].score, h.scans()[0].grade) == (40, "D")  # 35-54 is D
+    assert h.latest(1)[0]["score"] == 40
+    History(path)  # a second open must not convert again
+    assert h.scans()[0].score == 40
 
 
 def test_intent_and_paths():
@@ -105,14 +132,14 @@ def test_history_compare_and_keep(tmp_path, this_pc_raw):
     d1 = r1.to_dict(include_facts=False)
     d2 = dict(
         d1,
-        score=d1["score"] - 12,
+        score=d1["score"] + 12,
         findings=[
             *d1["findings"],
             {"id": "new", "title": "New", "severity": "high", "status": "open"},
         ],
     )
     diff = compare(d1, d2)
-    assert diff.score_change == -12 and [f["id"] for f in diff.new_findings] == ["new"]
+    assert diff.score_change == 12 and [f["id"] for f in diff.new_findings] == ["new"]
     assert compare(d2, d1).resolved_findings[0]["id"] == "new"
     assert compare(None, d1).empty
     h.accept("keep:x", 3, "X")
@@ -127,6 +154,6 @@ def test_keep_hides_until_wider(this_pc_raw):
     f = plain.finding("exposure.program:spotifylauncher.exe")
     kept = analyze(this_pc_raw, accepted={f.keep_key: f.width})
     assert kept.finding(f.id).status == FindingStatus.ACCEPTED
-    assert kept.score > plain.score
+    assert kept.score < plain.score
     narrower = analyze(this_pc_raw, accepted={f.keep_key: f.width - 1})
     assert narrower.finding(f.id).status == FindingStatus.OPEN

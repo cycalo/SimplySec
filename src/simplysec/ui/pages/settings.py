@@ -113,7 +113,7 @@ class SettingsPage(Page):
         dl.addWidget(
             label(
                 "Once a day SimplySec runs a read-only scan in the background and shows a notification "
-                "only if something got worse: the score drops by 5 or more, a new high-risk finding, "
+                "only if something got worse: the risk score rises by 5 or more, a new high-risk finding, "
                 "a new device on your network, or antivirus or the firewall turned off. It never "
                 "changes anything. The scheduled task is recorded on the Changes page.",
                 object_name="Dim",

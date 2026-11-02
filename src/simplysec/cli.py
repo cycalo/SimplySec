@@ -56,7 +56,7 @@ def _progress(text: str) -> None:
 def _print_scan(result: Any) -> None:
     _out(f"SimplySec {result.version} - {result.computer} - {result.started}")
     _out(
-        f"Score {result.score}/100, grade {result.grade}"
+        f"Risk score {result.score}/100 (lower is better), grade {result.grade}"
         + ("" if result.is_admin else "  (read-only: not running as administrator)")
     )
     for line in result.network_status():
@@ -274,7 +274,7 @@ def cmd_fix(args: argparse.Namespace) -> int:
             f"  Finding {fid}: {'resolved in a fresh scan' if gone else 'STILL PRESENT in a fresh scan'}"
         )
         ok = ok and gone
-    _out(f"Score {before.score} -> {after.score}")
+    _out(f"Risk score {before.score} -> {after.score}")
     return EXIT_OK if ok else EXIT_FAIL
 
 

@@ -1,6 +1,6 @@
 """Background daily check: a read-only scan, saved to history, with a toast only when it matters.
 
-Notifies when the score drops by 5 or more, a new High or Critical finding appears, a new
+Notifies when the risk score rises by 5 or more, a new High or Critical finding appears, a new
 device joins a confirmed network, or antivirus / the firewall was turned off. It never applies
 fixes.
 """
@@ -28,8 +28,8 @@ def triggers(prev: dict[str, Any] | None, cur: dict[str, Any]) -> list[str]:
     """Plain-language reasons to notify (empty: stay quiet)."""
     out: list[str] = []
     diff = compare(prev, cur)
-    if prev is not None and diff.score_change <= -5:
-        out.append(f"Your security score dropped from {prev.get('score')} to {cur.get('score')}.")
+    if prev is not None and diff.score_change >= 5:
+        out.append(f"Your risk score rose from {prev.get('score')} to {cur.get('score')}.")
     prev_open = {f["id"] for f in (prev or {}).get("findings", []) if f.get("status") == "open"}
     for f in cur.get("findings", []):
         if f.get("status") != "open" or f["id"] in prev_open:

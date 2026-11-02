@@ -455,7 +455,7 @@ def analyze_with_context(
         ports=rows,
         findings=findings,
         score=value,
-        grade=scoring.grade(value),
+        grade=scoring.grade(value, findings),
         errors=errors,
         facts=raw.facts,
     )

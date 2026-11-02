@@ -235,7 +235,7 @@ class ResultDialog(QDialog):
                     label(f"{mark}&nbsp; {html.escape(titles.get(fid, fid))}", rich=True)
                 )
         if score_before is not None and score_after is not None:
-            layout.addWidget(label(f"Score: {score_before} → {score_after}"))
+            layout.addWidget(label(f"Risk score: {score_before} → {score_after}"))
         for w in warnings:
             layout.addWidget(label(f"Note: {html.escape(w)}", object_name="Dim", rich=True))
         layout.addWidget(label("You can undo any of this on the Changes page.", object_name="Dim"))

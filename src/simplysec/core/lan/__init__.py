@@ -202,7 +202,7 @@ def scan_network(
         key=lambda f: (f.status != FindingStatus.OPEN, -int(f.severity), f.area, f.title)
     )
     result.score = scoring.score(result.findings)
-    result.grade = scoring.grade(result.score)
+    result.grade = scoring.grade(result.score, result.findings)
     result.extras["devices"] = [d.to_dict() for d in devices]
     result.extras["router"] = routers[0] if routers else {}
     result.extras["networks"] = [t.label for t in targets]

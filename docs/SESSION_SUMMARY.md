@@ -36,7 +36,7 @@ Follow-up changes after hands-on testing:
 | Commit | Change |
 |---|---|
 | `4b33445` | The GUI no longer scans automatically on start |
-| `801f74c` | Progress panel: steps done, current step, elapsed time, usual duration, "taking longer than usual" note; CLI progress shows elapsed seconds |
+| `801f74c` | Progress panel: steps done, current step, elapsed time (later: the "usually about N s" text and the "taking longer than usual" warning were replaced by a "still working" note after 150 s without news from a step); CLI progress shows elapsed seconds |
 | `ab3d1c5` | Fix: the progress panel stayed open after a scan finished (a background task's "finished" signal could be lost) |
 | `0bcd219` | Overview cards show "What this means" and a link to the full card; the confirmation window shows *why* each fix is suggested |
 | `a130338` | Impact analysis ("What uses this") for every fix; Fix recommended leaves out anything in use; per-fix tick boxes in the confirmation window; This PC ordered by severity with informational items hidden by default; Open ports "In use now" column |
@@ -109,7 +109,7 @@ Not run (each needs administrator rights or the owner's decision):
 
 ## State of this PC (latest scan)
 
-Score 65–67 (D), with no Critical or High findings. Main items:
+Risk score 35–40 (D; the score was inverted after this was written, it was then 65–67 on the old 100 = clean scale), with no Critical or High findings. Main items:
 
 - LLMNR and NetBIOS are on, and the Ethernet is set as a Public network.
 - The saved Wi-Fi network `VM3731498` uses TKIP and connects automatically.

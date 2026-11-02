@@ -159,7 +159,7 @@ Each check has a plain-language explanation, technical details, a severity, a re
 | System | AutoRun on; BitLocker off (Shell property, readable without admin; laptops weighted higher) | `NoDriveTypeAutoRun=255`; guidance |
 | Housekeeping | v1 leftovers; managed PC | Cleanup; report-only mode |
 
-**Score.** Start at 100 and subtract a weight for each open finding: Critical 25, High 12, Medium 5, Low 2. Grades run A to F. Accepted ("Keep") findings are shown but not scored. "Fix recommended" applies only non-disruptive fixes: firewall on, NLA, SMBv1 off, Remote Assistance off, Guest off, blank-password limit, UAC prompts. Disruptive fixes are always picked one at a time: turning RDP off, blocking ports or programs, LLMNR/NetBIOS, Controlled Folder Access, Wi-Fi changes.
+**Score.** A risk score: start at 0 and add a weight for each open finding (Critical 25, High 12, Medium 5, Low 2, capped at 100), so higher means riskier. Grades run A (lowest risk) to F. (Originally 100 minus the weights; inverted on 2026-11-02.) Accepted ("Keep") findings are shown but not scored. "Fix recommended" applies only non-disruptive fixes: firewall on, NLA, SMBv1 off, Remote Assistance off, Guest off, blank-password limit, UAC prompts. Disruptive fixes are always picked one at a time: turning RDP off, blocking ports or programs, LLMNR/NetBIOS, Controlled Folder Access, Wi-Fi changes.
 
 ## UI (PySide6, Windows 11 style)
 - **Overview:**

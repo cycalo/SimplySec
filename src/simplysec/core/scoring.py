@@ -88,22 +88,25 @@ def exposure_severity(
 
 
 def score(findings: Iterable[Finding]) -> int:
-    total = 100
+    """Risk score: 0 means nothing open, higher means riskier (capped at 100)."""
+    total = 0
     for f in findings:
         if f.scored:
-            total -= WEIGHTS[f.severity]
-    return max(0, total)
+            total += WEIGHTS[f.severity]
+    return min(100, total)
 
 
-def grade(value: int) -> str:
-    if value >= 90:
-        return "A"
-    if value >= 80:
-        return "B"
-    if value >= 70:
-        return "C"
-    if value >= 60:
-        return "D"
-    if value >= 50:
-        return "E"
-    return "F"
+# (highest risk score, letter): 31 with no High or Critical finding is a C, not an alarm.
+_BANDS = ((9, "A"), (19, "B"), (34, "C"), (54, "D"), (74, "E"))
+
+
+def grade(value: int, findings: Iterable[Finding] = ()) -> str:
+    """Letter for a risk score: A is the lowest risk, F the highest.
+
+    A Critical finding makes the grade at least D and a High one at least C, however few
+    other findings there are, so a single serious problem is never graded as "good".
+    """
+    letter = next((g for limit, g in _BANDS if value <= limit), "F")
+    worst = max((f.severity for f in findings if f.scored), default=Severity.INFO)
+    floor = "D" if worst == Severity.CRITICAL else "C" if worst == Severity.HIGH else "A"
+    return max(letter, floor)  # letters sort A < F

@@ -99,8 +99,14 @@ user-writable folder raises it. If the user configured the exposure on purpose (
 `OLLAMA_HOST=0.0.0.0`) it is capped at Low (Info on Private networks). `info` in the knowledge
 base means harmless by design and is never raised.
 
-Score = 100 − (Critical 25, High 12, Medium 5, Low 2 per open finding). Info, Kept, Managed and
-informational findings are not scored. Grades A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, E ≥ 50, F < 50.
+The **risk score** is 0 when nothing is open and rises with every open finding: Critical 25,
+High 12, Medium 5, Low 2 each, capped at 100. Higher means riskier. Info, Kept, Managed and
+informational findings are not scored. Grades A ≤ 9, B ≤ 19, C ≤ 34, D ≤ 54, E ≤ 74, F > 74, except that an open Critical finding
+makes the grade at least D and a High one at least C. The ring colour follows the grade
+(A, B green; C amber; D orange; E, F red).
+A score change is positive when the PC got riskier (the daily check notifies at +5).
+Scans saved before this scale (100 = clean) are converted once to `100 − old` when the history
+database is opened (setting `score_scale`).
 
 "Keep: I need this" stores the finding's exposure width; the finding is shown but not scored,
 and comes back only if it becomes reachable more widely.
@@ -222,7 +228,7 @@ reported as *Managed* and never changed.
 * `simplysec monitor --run` (what the task runs) does a read-only scan, also scans confirmed home
   networks, saves the result and compares it with the previous scan. It never applies fixes.
 * It shows a Windows toast (PowerShell's WinRT bridge, using PowerShell's registered app id, so
-  no extra package) only when the score dropped by 5 or more, a new High or Critical finding
+  no extra package) only when the risk score rose by 5 or more, a new High or Critical finding
   appeared, a new device joined, or antivirus or the firewall was turned off.
 
 ## Knowledge base
