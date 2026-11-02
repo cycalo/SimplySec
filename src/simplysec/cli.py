@@ -185,7 +185,9 @@ def cmd_fix(args: argparse.Namespace) -> int:
     before = engine.scan(progress=_progress, save=False)
     selections: list[Selection] = []
     if args.target == "recommended":
-        selections = engine.recommended(before)
+        selections, skipped = engine.recommended_split(before)
+        for title, why in skipped:
+            _out(f"Left out because it's in use right now: {title} ({why})")
         if not selections:
             _out("Nothing to fix: no open findings have a recommended, non-disruptive fix.")
             return EXIT_OK
@@ -232,6 +234,10 @@ def cmd_fix(args: argparse.Namespace) -> int:
         _out(f"  {item.fix.label}")
         for s in item.specs:
             _out(f"    - {s.summary}")
+        if item.impact is not None:
+            _out(f"    What uses this: {item.impact.level.label} - {item.impact.headline}")
+            for e in item.impact.evidence[:8]:
+                _out(f"      * {e}")
         for w in item.warnings:
             _out(f"    ! {w.text}")
             if w.offer_fix:

@@ -1,10 +1,10 @@
-"""This PC: every finding as a card, grouped by area."""
+"""This PC: every finding as a card, most serious first (topic shown on each card)."""
 
 from __future__ import annotations
 
 from PySide6.QtWidgets import QCheckBox
 
-from ...core.models import FindingStatus
+from ...core.models import FindingStatus, Severity
 from ..controller import Controller
 from ..widgets import label
 from ..widgets.finding_card import FindingCard
@@ -34,8 +34,8 @@ class ThisPcPage(Page):
             "Each finding explains what it means. Nothing changes until you choose a fix and confirm it.",
         )
         self.ctl = ctl
-        self.show_info = QCheckBox("Show informational items and kept risks")
-        self.show_info.setChecked(True)
+        self.show_info = QCheckBox("Also show informational items and risks you chose to keep")
+        self.show_info.setChecked(False)
         self.show_info.toggled.connect(lambda _: self.refresh())
         self.layout_.insertWidget(2, self.show_info)
         self.body.addWidget(label("Run a scan from the Overview page.", object_name="Dim"))
@@ -57,16 +57,26 @@ class ThisPcPage(Page):
                 label("No findings. Nothing needs your attention.", object_name="Dim")
             )
             return
-        areas = sorted(
-            {f.area for f in findings}, key=lambda a: AREA_ORDER.index(a) if a in AREA_ORDER else 99
-        )
-        for area in areas:
-            items = [f for f in findings if f.area == area]
-            open_n = sum(1 for f in items if f.scored)
-            suffix = f" – {open_n} to look at" if open_n else ""
-            self.body.addWidget(label(f"{area}{suffix}", object_name="SectionTitle"))
+        groups = [
+            ("Needs attention", lambda f: f.scored and f.severity >= Severity.HIGH),
+            ("Worth fixing", lambda f: f.scored and f.severity == Severity.MEDIUM),
+            ("Minor", lambda f: f.scored and f.severity == Severity.LOW),
+            ("For information and kept risks", lambda f: not f.scored),
+        ]
+        for title, test in groups:
+            items = sorted(
+                (f for f in findings if test(f)),
+                key=lambda f: (
+                    -int(f.severity),
+                    AREA_ORDER.index(f.area) if f.area in AREA_ORDER else 99,
+                    f.title,
+                ),
+            )
+            if not items:
+                continue
+            self.body.addWidget(label(f"{title} ({len(items)})", object_name="SectionTitle"))
             for f in items:
-                c = FindingCard(f)
+                c = FindingCard(f, show_area=True)
                 c.fix_requested.connect(self.ctl.request_fix)
                 c.keep_requested.connect(self.ctl.keep)
                 c.unkeep_requested.connect(lambda fi: self.ctl.unkeep(fi.keep_key))

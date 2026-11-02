@@ -18,11 +18,13 @@ from typing import Any
 
 from .. import __version__
 from . import checks as checks_pkg
+from . import impact as impact_mod
 from . import knowledge, scoring
 from .actions import PRIMITIVES, Adapters
 from .checks.base import Facts, FixDef, PortGroup, ScanContext, SignatureInfo, Warning_
 from .checks.exposure import exposure_severity_for_group
 from .exposure import EvalContext, evaluate_all
+from .impact import Impact
 from .journal import APPLIED, REVERT_FAILED, ChangeRecord, Journal
 from .models import (
     ActionSpec,
@@ -38,6 +40,7 @@ from .models import (
     Severity,
     Verdict,
 )
+from .util import as_list
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +126,7 @@ class PortRow:
     reason: str
     rules: list[str]
     finding_id: str | None = None
+    connected: list[str] = field(default_factory=list)  # remote IPs connected right now
 
     def to_dict(self) -> dict[str, Any]:
         d = dict(self.__dict__)
@@ -318,6 +322,25 @@ def environment_for_paths(env: dict[str, str]) -> dict[str, str]:
     return {k.upper(): v for k, v in env.items()}
 
 
+def attach_impacts(findings: list[Finding], ctx: ScanContext) -> None:
+    """Work out, for every fix offered on an open finding, what it would affect right now."""
+    for f in findings:
+        if f.status != FindingStatus.OPEN:
+            continue
+        for opt in f.fixes:
+            fix = checks_pkg.FIXES.get(opt.fix_id)
+            if fix is None or fix.build is None:
+                continue
+            try:
+                impact = impact_mod.assess(fix.id, opt.params, fix.build(opt.params), ctx)
+            except Exception as exc:  # never let impact analysis break a scan
+                log.warning("impact of %s failed: %s", opt.fix_id, exc)
+                impact = impact_mod.Impact(
+                    impact_mod.Level.UNKNOWN, "SimplySec could not work out what this affects."
+                )
+            opt.impact = impact.to_dict()
+
+
 def analyze(
     raw: RawScan,
     kb: knowledge.KnowledgeBase | None = None,
@@ -372,6 +395,7 @@ def analyze_with_context(
                 )
             )
     findings.sort(key=lambda f: (f.status != FindingStatus.OPEN, -int(f.severity), f.area, f.title))
+    attach_impacts(findings, ctx)
 
     by_subject = {}
     for f in findings:
@@ -405,6 +429,15 @@ def analyze_with_context(
                 reason=reason,
                 rules=rules,
                 finding_id=finding_id,
+                connected=sorted(
+                    {
+                        str(c.get("remote_ip"))
+                        for c in as_list((ctx.facts.get("usage") or {}).get("connections"))
+                        if c.get("local_port") == g.port
+                        and c.get("pid") == g.pid
+                        and g.protocol == "tcp"
+                    }
+                ),
             )
         )
     value = scoring.score(findings)
@@ -446,6 +479,7 @@ class PlannedFix:
     finding_id: str | None
     specs: list[ActionSpec]
     warnings: list[Warning_]
+    impact: Impact | None = None
 
 
 @dataclass
@@ -512,7 +546,8 @@ def build_plan(selections: list[Selection], ctx_scan: ScanContext | None = None)
             plan.refused.append(f"{fix.label}: refused, not on the allow-list ({bad[0].kind})")
             continue
         warnings = fix.warnings(ctx_scan, sel.params) if (fix.warnings and ctx_scan) else []
-        plan.items.append(PlannedFix(fix, sel.params, sel.finding_id, specs, warnings))
+        impact = impact_mod.assess(fix.id, sel.params, specs, ctx_scan) if ctx_scan else None
+        plan.items.append(PlannedFix(fix, sel.params, sel.finding_id, specs, warnings, impact))
     return plan
 
 
@@ -614,17 +649,27 @@ class Engine:
         return build_plan(selections, self.last_ctx)
 
     def recommended(self, result: ScanResult | None = None) -> list[Selection]:
-        """'Fix recommended': only non-disruptive fixes on open findings."""
+        """'Fix recommended': only non-disruptive fixes on open findings, and never one that
+        something is using right now (those must be chosen one at a time)."""
+        return self.recommended_split(result)[0]
+
+    def recommended_split(
+        self, result: ScanResult | None = None
+    ) -> tuple[list[Selection], list[tuple[str, str]]]:
+        """(selections, skipped) where skipped lists (finding title, why) for in-use fixes."""
         result = result or self.last_result
         if result is None:
-            return []
-        out = []
+            return [], []
+        out, skipped = [], []
         for f in result.open_findings:
             for opt in f.fixes:
                 if opt.recommended and not opt.disruptive and not opt.guidance_only:
-                    out.append(Selection(opt.fix_id, opt.params, f.id))
+                    if opt.impact.get("level") == impact_mod.Level.IN_USE.value:
+                        skipped.append((f.title, opt.impact.get("headline", "")))
+                    else:
+                        out.append(Selection(opt.fix_id, opt.params, f.id))
                     break
-        return out
+        return out, skipped
 
     def apply(
         self, plan: Plan, restore_point: bool = False, progress: Progress | None = None

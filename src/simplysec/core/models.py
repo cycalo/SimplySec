@@ -391,6 +391,7 @@ class FixOption:
     disruptive: bool = False
     recommended: bool = False  # included in "Fix recommended"
     guidance_only: bool = False  # opens Settings etc.; no tracked change
+    impact: dict[str, Any] = field(default_factory=dict)  # core.impact.Impact as a dict
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

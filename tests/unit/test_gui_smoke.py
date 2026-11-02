@@ -43,6 +43,7 @@ def test_preview_dialog_lists_changes_and_offer(window):
         [Selection("exposure.block_program_public", {"exe": r"C:\x\a.exe", "label": "A"}, None)]
     )
     dlg = PreviewDialog(plan, is_admin=False)
+    assert dlg._items and dlg._items[0].isChecked()
     assert dlg._offers, "the Public-network warning should offer to mark the network Private"
     assert dlg.choice().accepted is False
 

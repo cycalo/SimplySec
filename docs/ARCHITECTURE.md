@@ -137,6 +137,22 @@ before-state, `apply`, `verify` by reading the real state back, and `revert`.
 * Verification is never assumed: each change is re-read from the OS, and the GUI/CLI run a fresh
   scan and report whether each finding is resolved.
 
+### What a fix would affect (`core/impact.py`)
+
+Every fix offered on an open finding gets an impact assessment at scan time, recomputed in the
+preview. Firewall-type fixes (block rules, profile changes, marking a network Private, removing
+v1 rules) are **simulated**: the change is applied to a copy of the firewall model and the
+affected listeners are re-evaluated, giving the exact programs, ports and networks that stop (or
+start) being reachable. Other fixes use **live usage** collected by `windows/usage.py`:
+devices connected right now, Remote Desktop sessions (including whether you are connected
+remotely), mapped drives and printers reached by short names (NetBIOS/LLMNR), SMB1 clients
+(admin), Guest's last sign-in, Remote Assistance running.
+
+Levels: *In use right now* (the fix starts unticked in the preview and is left out of Fix
+recommended), *Might affect something you use* (the evidence is listed), *Nothing found using
+this*, and *SimplySec can't check this*. If the live-usage data couldn't be collected, nothing
+is ever reported as unused.
+
 ### Read-only mode and elevation
 
 Scans need no admin. Per-user data (scan history, settings, accepted risks, devices) lives in

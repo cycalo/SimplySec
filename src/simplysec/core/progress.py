@@ -9,7 +9,7 @@ from __future__ import annotations
 
 DONE = "\u2713 "
 
-SCAN_STEPS = 6  # listeners, firewall, signatures, Wi-Fi, Windows settings, analysis
+SCAN_STEPS = 7  # listeners, firewall, signatures, Wi-Fi, usage, Windows settings, analysis
 NETWORK_STEPS_PER_TARGET = 4  # devices, services, names, router
 
 

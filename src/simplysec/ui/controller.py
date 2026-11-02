@@ -219,15 +219,19 @@ class Controller(QObject):
         )
 
     def request_recommended(self) -> None:
-        sels = self.engine.recommended(self.result)
+        sels, skipped = self.engine.recommended_split(self.result)
+        notes = [
+            f"Left out because it's in use right now: {title} ({why})" for title, why in skipped
+        ]
         if not sels:
             QMessageBox.information(
                 self.window,
                 "Nothing to fix",
-                "There are no recommended, non-disruptive fixes for the open findings.",
+                "There are no recommended, non-disruptive fixes that are safe to apply together."
+                + ("\n\n" + "\n".join(notes) if notes else ""),
             )
             return
-        self.request_fixes(sels)
+        self.request_fixes(sels, notes)
 
     def _open_guidance(self, option: FixOption) -> None:
         from ..core.checks import FIXES
@@ -240,10 +244,11 @@ class Controller(QObject):
             except Exception as exc:
                 self.error.emit(f"Could not open Settings: {exc}")
 
-    def request_fixes(self, selections: list[Selection]) -> None:
+    def request_fixes(self, selections: list[Selection], notes: list[str] | None = None) -> None:
         if self.busy:
             return
         plan = self.engine.plan(selections)
+        plan.refused.extend(notes or [])
         if not plan.items:
             QMessageBox.warning(
                 self.window, "Can't apply", "\n".join(plan.refused) or "Nothing to apply."
@@ -253,14 +258,16 @@ class Controller(QObject):
         dlg = PreviewDialog(plan, self.is_admin, self.window, findings)
         dlg.exec()
         choice = dlg.choice()
-        if not choice.accepted:
+        if not choice.accepted or not choice.included:
             return
+        kept = {(plan.items[i].fix.id, plan.items[i].finding_id) for i in choice.included}
+        selections = [s for s in selections if (s.fix_id, s.finding_id) in kept]
         if choice.extra:
             extra = [
                 Selection(w.offer_fix, w.offer_params, None) for w in choice.extra if w.offer_fix
             ]
             selections = extra + selections
-            plan = self.engine.plan(selections)
+        plan = self.engine.plan(selections)
         before = self.result
         if self.is_admin:
             self._apply_in_process(plan, choice.restore_point, before)

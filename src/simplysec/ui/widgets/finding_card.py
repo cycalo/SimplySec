@@ -8,9 +8,11 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QToolButton, QVBoxLayout, QWidget
 
+from ...core.impact import Impact
 from ...core.models import Finding, FindingStatus, FixOption, Severity
 from .. import theme
 from . import label
+from .fix_dialogs import IMPACT_COLORS
 
 STATUS_TEXT = {
     FindingStatus.ACCEPTED: ("Kept", "#5D5D5D"),
@@ -28,7 +30,11 @@ class FindingCard(QFrame):
     details_requested = Signal(object)  # Finding: open the full card on This PC
 
     def __init__(
-        self, finding: Finding, parent: QWidget | None = None, compact: bool = False
+        self,
+        finding: Finding,
+        parent: QWidget | None = None,
+        compact: bool = False,
+        show_area: bool = False,
     ) -> None:
         super().__init__(parent)
         self.finding = finding
@@ -50,6 +56,10 @@ class FindingCard(QFrame):
             st = QLabel(theme.chip(text, color))
             st.setTextFormat(Qt.TextFormat.RichText)
             head.addWidget(st, 0, Qt.AlignmentFlag.AlignTop)
+        if show_area:
+            area = QLabel(finding.area)
+            area.setObjectName("Dim")
+            head.addWidget(area, 0, Qt.AlignmentFlag.AlignTop)
         if finding.user_configured:
             st = QLabel(theme.chip("You set this up", "#0F6CBD"))
             st.setTextFormat(Qt.TextFormat.RichText)
@@ -67,6 +77,20 @@ class FindingCard(QFrame):
             self.learn.setVisible(False)
             outer.addWidget(self.details)
             outer.addWidget(self.learn)
+
+        primary = next((o for o in finding.fixes if o.impact), None)
+        if primary is not None and finding.status == FindingStatus.OPEN:
+            imp = Impact.from_dict(primary.impact)
+            color = IMPACT_COLORS[imp.level.value]
+            text = (
+                f"<b>What uses this:</b> <span style='color:{color}'>{html.escape(imp.level.label)}</span>"
+                f" – {html.escape(imp.headline)}"
+            )
+            if imp.evidence:
+                text += "<br>" + "<br>".join(f"• {html.escape(e)}" for e in imp.evidence[:3])
+                if len(imp.evidence) > 3:
+                    text += f"<br>• …and {len(imp.evidence) - 3} more (shown before you apply)"
+            outer.addWidget(label(text, rich=True))
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)

@@ -18,7 +18,7 @@ from ..core.engine import RawScan
 from ..core.exposure import normalize_app_path
 from ..core.models import FirewallState, Profile
 from ..core.progress import done
-from . import firewall, listeners, network, runner
+from . import firewall, listeners, network, runner, usage
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
             progress(text)
 
     say("Reading listening programs, firewall rules and Windows security settings…")
-    with ThreadPoolExecutor(max_workers=4, thread_name_prefix="collect") as pool:
+    with ThreadPoolExecutor(max_workers=5, thread_name_prefix="collect") as pool:
         f_facts = pool.submit(_facts)
         f_listeners = pool.submit(listeners.read_listeners)
         f_firewall = pool.submit(firewall.read_state)
@@ -142,14 +142,17 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
         say(f"Checking {len(exes)} program signatures and saved Wi-Fi networks…")
         f_sigs = pool.submit(listeners.signatures, sorted(exes))
         f_wifi = pool.submit(_wifi)
+        f_usage = pool.submit(usage.collect, lst)
 
         facts: dict[str, Any] = {}
         sigs: dict[str, SignatureInfo] = {}
         wifi_fact: dict[str, Any] = {"status": "error", "error": "not collected"}
+        usage_fact: dict[str, Any] = {"status": "error", "error": "not collected"}
         labels = {
             f_facts: "Windows security settings (Defender, updates, sharing, accounts…)",
             f_sigs: "program signatures",
             f_wifi: "saved Wi-Fi networks",
+            f_usage: "what's in use right now (connections, sessions, drives)",
         }
         for fut in as_completed(labels):
             try:
@@ -161,6 +164,10 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
                         k: SignatureInfo(v.status, v.publisher) for k, v in fut.result().items()
                     }
                     say(done(f"Checked {len(sigs)} {labels[fut]}"))
+                elif fut is f_usage:
+                    usage_fact = fut.result()
+                    n = len(usage_fact.get("value", {}).get("connections", []))
+                    say(done(f"Checked what's in use right now ({n} incoming connection(s))"))
                 else:
                     wifi_fact = fut.result()
                     say(done(f"Read {labels[fut]}"))
@@ -172,6 +179,7 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
             if pending:
                 say("Still waiting for: " + ", ".join(pending) + "…")
         facts["wifi"] = wifi_fact
+        facts["usage"] = usage_fact
 
     net_fact = (
         facts.get("network", {}).get("value") if isinstance(facts.get("network"), dict) else None

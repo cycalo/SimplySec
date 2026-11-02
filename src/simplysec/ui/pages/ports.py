@@ -23,7 +23,16 @@ from ..controller import Controller
 from ..widgets import label
 from . import Page
 
-COLUMNS = ["Port", "Program (publisher)", "Listening on", "Reachable from", "Risk", "Action"]
+COLUMNS = [
+    "Port",
+    "Program (publisher)",
+    "Listening on",
+    "Reachable from",
+    "In use now",
+    "Risk",
+    "Action",
+]
+IN_USE, RISK, ACTION = 4, 5, 6
 
 
 class PortModel(QAbstractTableModel):
@@ -63,26 +72,33 @@ class PortModel(QAbstractTableModel):
                 return r.listening_on
             if col == 3:
                 return r.reachable_from
-            if col == 4:
+            if col == IN_USE:
+                n = len(r.connected)
+                return f"{n} device{'s' if n != 1 else ''} connected" if n else ""
+            if col == RISK:
                 return r.risk.label if r.verdict == Verdict.REACHABLE else "–"
-            if col == 5:
+            if col == ACTION:
                 if r.finding_id:
                     return "Review…"
                 return "Details…"
         if role == Qt.ItemDataRole.UserRole:  # sort keys
             if col == 0:
                 return (r.port, r.protocol)
-            if col == 4:
+            if col == RISK:
                 return int(r.risk) if r.verdict == Verdict.REACHABLE else -1
+            if col == IN_USE:
+                return len(r.connected)
             return self.data(index, Qt.ItemDataRole.DisplayRole)
         if role == Qt.ItemDataRole.ForegroundRole:
-            if col == 4 and r.verdict == Verdict.REACHABLE:
+            if col == RISK and r.verdict == Verdict.REACHABLE:
                 return QColor(theme.SEVERITY_COLORS[r.risk])
             if col == 3 and r.verdict == Verdict.UNCERTAIN:
                 return QColor(theme.SEVERITY_COLORS[r.risk.MEDIUM])
-            if col == 5:
+            if col == ACTION:
                 return QColor(theme.colors().accent)
         if role == Qt.ItemDataRole.ToolTipRole:
+            if col == IN_USE and r.connected:
+                return "Connected right now from: " + ", ".join(r.connected)
             return r.reason
         return None
 
@@ -131,7 +147,7 @@ class PortsPage(Page):
         self.table = QTableView()
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
-        self.table.sortByColumn(4, Qt.SortOrder.DescendingOrder)
+        self.table.sortByColumn(RISK, Qt.SortOrder.DescendingOrder)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
@@ -141,7 +157,7 @@ class PortsPage(Page):
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         hdr.setStretchLastSection(False)
-        for col, width in enumerate([90, 260, 180, 330, 80, 90]):
+        for col, width in enumerate([90, 250, 170, 300, 120, 70, 80]):
             self.table.setColumnWidth(col, width)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.clicked.connect(self._clicked)
@@ -179,7 +195,7 @@ class PortsPage(Page):
         return self.model.rows[self.proxy.mapToSource(index).row()]
 
     def _clicked(self, index: QModelIndex) -> None:
-        if index.column() != 5:
+        if index.column() != ACTION:
             return
         r = self._row(index)
         if r.finding_id and self.ctl.result:
@@ -209,7 +225,9 @@ class PortsPage(Page):
         text = (
             f"<b>{html.escape(r.protocol.upper())} {r.port}</b> – {html.escape(r.process)} (PID {r.pid})<br>"
             f"{html.escape(r.exe)}<br><br><b>Listening on:</b> {html.escape(r.listening_on)}<br>"
-            f"<b>Reachable from:</b> {html.escape(r.reachable_from)}<br><br>{html.escape(r.reason)}<br><br>"
+            f"<b>Reachable from:</b> {html.escape(r.reachable_from)}<br>"
+            f"<b>Connected right now:</b> {html.escape(', '.join(r.connected) or 'nobody')}<br><br>"
+            f"{html.escape(r.reason)}<br><br>"
             f"<b>Firewall rules involved:</b><ul>{rules}</ul>"
         )
         box = QMessageBox(self)
