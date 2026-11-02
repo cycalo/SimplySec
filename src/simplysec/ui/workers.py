@@ -1,4 +1,10 @@
-"""Run slow work (scans, fixes, undo) on a QThreadPool so the window never freezes."""
+"""Run slow work (scans, fixes, undo) on a QThreadPool so the window never freezes.
+
+Every task ends with exactly one signal (``result`` or ``error``) delivered on the GUI thread.
+The "finished" callback runs from that same delivery, before the result handler, so the busy
+state always clears (and clears before any result dialog opens). Workers are kept referenced
+until then, so a queued signal can't be lost when Python frees the worker.
+"""
 
 from __future__ import annotations
 
@@ -12,12 +18,13 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
 log = logging.getLogger(__name__)
 
+_running: set[Worker] = set()
+
 
 class WorkerSignals(QObject):
     progress = Signal(str)
     result = Signal(object)
     error = Signal(str)
-    finished = Signal()
 
 
 class Worker(QRunnable):
@@ -25,7 +32,7 @@ class Worker(QRunnable):
         super().__init__()
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.signals = WorkerSignals()
-        self.setAutoDelete(True)
+        self.setAutoDelete(False)
 
     def run(self) -> None:
         try:
@@ -43,8 +50,6 @@ class Worker(QRunnable):
             self.signals.error.emit(str(exc) or exc.__class__.__name__)
         else:
             self.signals.result.emit(result)
-        finally:
-            self.signals.finished.emit()
 
 
 def run_in_background(
@@ -57,13 +62,20 @@ def run_in_background(
     **kwargs: Any,
 ) -> Worker:
     worker = Worker(fn, *args, **kwargs)
-    if on_result:
-        worker.signals.result.connect(on_result)
-    if on_error:
-        worker.signals.error.connect(on_error)
+
+    def end(handler: Callable[[Any], None] | None, value: Any) -> None:
+        _running.discard(worker)
+        try:
+            if on_finished:
+                on_finished()
+        finally:
+            if handler:
+                handler(value)
+
+    worker.signals.result.connect(lambda value: end(on_result, value))
+    worker.signals.error.connect(lambda message: end(on_error, message))
     if on_progress:
         worker.signals.progress.connect(on_progress)
-    if on_finished:
-        worker.signals.finished.connect(on_finished)
+    _running.add(worker)
     QThreadPool.globalInstance().start(worker)
     return worker

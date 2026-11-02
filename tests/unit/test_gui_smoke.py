@@ -45,3 +45,30 @@ def test_preview_dialog_lists_changes_and_offer(window):
     dlg = PreviewDialog(plan, is_admin=False)
     assert dlg._offers, "the Public-network warning should offer to mark the network Private"
     assert dlg.choice().accepted is False
+
+
+def test_background_tasks_always_finish(qtbot):
+    """The busy state must always clear: finished runs once per task, before the result."""
+    from simplysec.ui.workers import _running, run_in_background
+
+    events: list[str] = []
+
+    def ok(progress):
+        progress("working")
+        return 1
+
+    def boom():
+        raise RuntimeError("x")
+
+    for i in range(25):
+        run_in_background(
+            ok if i % 5 else boom,
+            on_result=lambda v: events.append("result"),
+            on_error=lambda e: events.append("error"),
+            on_finished=lambda: events.append("finished"),
+        )
+    qtbot.waitUntil(lambda: events.count("finished") == 25, timeout=10000)
+    qtbot.waitUntil(lambda: not _running, timeout=2000)
+    assert events.count("result") == 20 and events.count("error") == 5
+    pairs = list(zip(events[::2], events[1::2], strict=True))
+    assert all(a == "finished" for a, _ in pairs)
