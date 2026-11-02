@@ -5,7 +5,7 @@ reports what other devices can really reach on this PC, explains it plainly, fix
 verifies each change and can undo everything. It then refined the GUI based on hands-on
 feedback.
 
-All work is on branch `v2` (13 commits, not pushed). v1 is preserved at tag `v1-legacy` on
+All work is on branch `v2` (not pushed). v1 is preserved at tag `v1-legacy` on
 `main` and in [legacy/v1/](../legacy/v1/). See [ARCHITECTURE.md](ARCHITECTURE.md) for how it
 works and [ADDING_A_CHECK.md](ADDING_A_CHECK.md) for extending it.
 
@@ -40,6 +40,18 @@ Follow-up changes after hands-on testing:
 | `ab3d1c5` | Fix: the progress panel stayed open after a scan finished (a background task's "finished" signal could be lost) |
 | `0bcd219` | Overview cards show "What this means" and a link to the full card; the confirmation window shows *why* each fix is suggested |
 | `a130338` | Impact analysis ("What uses this") for every fix; Fix recommended leaves out anything in use; per-fix tick boxes in the confirmation window; This PC ordered by severity with informational items hidden by default; Open ports "In use now" column |
+| `43789e0` | Overview cards expand in place ("Show more") instead of jumping to This PC |
+| `e9f50b3` | Sidebar shows a coloured mode label (amber Read-only / green Administrator) with a "Restart as administrator" button |
+| `1bef7a9` | Guidance about other devices: My network page shows "What to do about your devices" cards (advice visible; click a device row to jump to its card) and router findings with steps in the Router section; router findings explain where to change the setting; This PC has a separate "Other devices on your network and your router" group; Overview lists "Top things to look at", including advice-only findings with a "How to fix" toggle |
+
+### Scope of the network scan
+
+The app scans other devices only on a network you confirm is yours. It finds devices, their
+maker and name, and checks about 45 risky ports. It also reads the router's UPnP port forwards
+(read-only). It does **not** look up known vulnerabilities (CVEs), test passwords or change
+anything on other devices; those get guidance only. The optional nmap deep scan adds software
+names and versions. CVE lookup would be a separate, larger feature that needs an online
+vulnerability database.
 
 ## Accuracy problems found and solved during the build
 
@@ -120,5 +132,7 @@ No settings were changed on this PC during the session. Side effects:
 - Run the four unrun verification steps above.
 - Speed up scans by caching program signatures (currently about 9 of the 15 seconds).
 - Code-sign the exe to avoid the SmartScreen warning.
+- Write device-specific advice (cameras, printers, NAS, smart TVs): some per-port advice
+  reads oddly on devices, e.g. "Use SSH instead" for Telnet on a camera.
 - Decide whether the Ethernet should be marked Private. Its confirmation window lists what
   would become reachable from it.
