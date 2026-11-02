@@ -31,7 +31,7 @@ def test_spec_lists_the_same_data():
     spec = (PKG.parents[1] / "packaging" / "simplysec.spec").read_text(encoding="utf-8")
     for needle in (
         "knowledge",
-        "facts",
+        "*.ps1",
         "templates",
         "oui.csv.gz",
         "simplysec.ico",
