@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simplysec"
+version = "2.0.0"
+description = "Plain-language Windows security checks: what is really reachable, explained, fixed precisely and undoable."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "cycalo" }]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Environment :: Win32 (MS Windows)",
+]
+dependencies = [
+    "PySide6-Essentials>=6.6",
+    "psutil>=5.9",
+    "pywin32>=306",
+    "defusedxml>=0.7.1",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-qt>=4.4",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pyinstaller>=6.6",
+]
+
+[project.scripts]
+simplysec = "simplysec.__main__:main"
+
+[project.gui-scripts]
+simplysec-gui = "simplysec.__main__:gui_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+simplysec = [
+    "core/knowledge/*.toml",
+    "windows/scripts/*.ps1",
+    "core/report/templates/*.j2",
+    "resources/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m 'not admin'"
+markers = [
+    "admin: needs an elevated prompt and changes this PC (opt-in: pytest -m admin)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "SIM105"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+ignore_missing_imports = true
