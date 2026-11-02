@@ -587,7 +587,7 @@ class Engine:
     ) -> ScanResult:
         raw = self.collect(progress)
         if progress:
-            progress("Working out what other devices can reach…")
+            progress("Working out what other devices can reach and checking settings…")
         accepted = {}
         try:
             accepted = self.history.accepted_widths()
@@ -597,6 +597,10 @@ class Engine:
             raw, accepted=accepted, file_exists=os.path.exists if self._collector is None else None
         )
         self.last_raw, self.last_result, self.last_ctx = raw, result, ctx
+        if progress:
+            from .progress import done
+
+            progress(done(f"Analysed: {len(result.open_findings)} things to look at"))
         if save:
             try:
                 self.history.save_scan(result, kind=kind)

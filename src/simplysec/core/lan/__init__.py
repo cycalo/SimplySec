@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from .. import knowledge, scoring
 from ..models import FindingStatus
+from ..progress import done
 from . import discovery, identify, ssdp
 from .discovery import ScanTarget, scan_targets
 from .inventory import Device, device_findings, router_findings
@@ -139,9 +140,11 @@ def scan_network(
             (set(alive) | set(neigh)) - {target.local_ip},
             key=lambda s: tuple(int(x) for x in s.split(".")),
         )
+        say(done(f"Found {len(ips)} device(s) on {target.network}"))
         say(f"Checking which services {len(ips)} device(s) offer…")
         open_map = discovery.sweep(ips, probe_ports, timeout=0.8)
-        say("Identifying devices…")
+        say(done(f"Checked {len(probe_ports)} services on each device"))
+        say("Identifying devices (vendor, name)…")
         rdns = _reverse_dns(ips)
         names = _ssdp_names(target)
         deep_map: dict[str, Any] = {}
@@ -170,8 +173,10 @@ def scan_network(
                 d.services = [s.__dict__ for s in deep_map[ip].services]
                 d.vendor = d.vendor or deep_map[ip].vendor
             devices.append(d)
+        say(done("Identified devices"))
         say("Reading your router's port forwards (UPnP)…")
         routers.append(read_router(list(target.gateways), [target.network]).to_dict())
+        say(done("Read the router"))
 
     # Inventory: remember devices by MAC; flag new ones after the first network scan.
     first_scan = not known_before

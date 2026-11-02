@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +42,11 @@ def _engine() -> Any:
     return Engine()
 
 
+_STARTED = time.monotonic()
+
+
 def _progress(text: str) -> None:
+    text = f"[{time.monotonic() - _STARTED:4.0f}s] {text}"
     print(f"  {text}", file=sys.stderr)
 
 

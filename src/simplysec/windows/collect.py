@@ -8,7 +8,7 @@ import os
 import time
 import winreg
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from ..app import elevation, paths
@@ -17,6 +17,7 @@ from ..core.checks.base import SignatureInfo
 from ..core.engine import RawScan
 from ..core.exposure import normalize_app_path
 from ..core.models import FirewallState, Profile
+from ..core.progress import done
 from . import firewall, listeners, network, runner
 
 log = logging.getLogger(__name__)
@@ -102,25 +103,28 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
         if progress:
             progress(text)
 
-    say("Reading Windows security settings…")
-    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="collect") as pool:
+    say("Reading listening programs, firewall rules and Windows security settings…")
+    with ThreadPoolExecutor(max_workers=4, thread_name_prefix="collect") as pool:
         f_facts = pool.submit(_facts)
-        say("Finding programs that listen for connections…")
         f_listeners = pool.submit(listeners.read_listeners)
         f_firewall = pool.submit(firewall.read_state)
 
         try:
             lst = f_listeners.result()
+            say(done(f"Found {len(lst)} listening sockets"))
         except Exception as exc:
             log.exception("listeners failed")
             errors.append(f"could not list listening ports: {exc}")
             lst = []
+            say(done("Could not list listening programs (reported as a problem)"))
         try:
             fw = f_firewall.result()
+            say(done(f"Read {len(fw.rules)} firewall rules"))
         except Exception as exc:
             log.exception("firewall read failed")
             errors.append(f"could not read the firewall: {exc}")
             fw = FirewallState(profiles={})
+            say(done("Could not read the firewall (reported as a problem)"))
 
         env = environment()
         windows_dir = env.get("SYSTEMROOT", r"C:\Windows")
@@ -135,23 +139,39 @@ def collect(progress: Callable[[str], None] | None = None) -> RawScan:
                 app = normalize_app_path(r.application, env)
                 if app and app != "system" and not app.startswith(windows_dir.lower()):
                     exes.add(app)
-        say("Checking program signatures…")
+        say(f"Checking {len(exes)} program signatures and saved Wi-Fi networks…")
         f_sigs = pool.submit(listeners.signatures, sorted(exes))
         f_wifi = pool.submit(_wifi)
 
-        try:
-            facts = f_facts.result()
-        except Exception as exc:
-            log.exception("facts.ps1 failed")
-            errors.append(f"could not read Windows settings: {exc}")
-            facts = {}
-        facts["wifi"] = f_wifi.result()
-        try:
-            sigs = {k: SignatureInfo(v.status, v.publisher) for k, v in f_sigs.result().items()}
-        except Exception as exc:
-            log.warning("signature check failed: %s", exc)
-            errors.append(f"could not check signatures: {exc}")
-            sigs = {}
+        facts: dict[str, Any] = {}
+        sigs: dict[str, SignatureInfo] = {}
+        wifi_fact: dict[str, Any] = {"status": "error", "error": "not collected"}
+        labels = {
+            f_facts: "Windows security settings (Defender, updates, sharing, accounts…)",
+            f_sigs: "program signatures",
+            f_wifi: "saved Wi-Fi networks",
+        }
+        for fut in as_completed(labels):
+            try:
+                if fut is f_facts:
+                    facts = fut.result()
+                    say(done(f"Read {labels[fut]}"))
+                elif fut is f_sigs:
+                    sigs = {
+                        k: SignatureInfo(v.status, v.publisher) for k, v in fut.result().items()
+                    }
+                    say(done(f"Checked {len(sigs)} {labels[fut]}"))
+                else:
+                    wifi_fact = fut.result()
+                    say(done(f"Read {labels[fut]}"))
+            except Exception as exc:
+                log.warning("%s failed: %s", labels[fut], exc)
+                errors.append(f"could not read {labels[fut]}: {exc}")
+                say(done(f"Could not read {labels[fut]} (reported as a problem)"))
+            pending = [labels[f] for f in labels if not f.done()]
+            if pending:
+                say("Still waiting for: " + ", ".join(pending) + "…")
+        facts["wifi"] = wifi_fact
 
     net_fact = (
         facts.get("network", {}).get("value") if isinstance(facts.get("network"), dict) else None

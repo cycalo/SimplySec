@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QMessageBox,
-    QProgressBar,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -25,6 +24,7 @@ from .pages.overview import OverviewPage
 from .pages.ports import PortsPage
 from .pages.settings import SettingsPage
 from .pages.this_pc import ThisPcPage
+from .widgets.progress_panel import ProgressPanel
 
 
 class MainWindow(QMainWindow):
@@ -65,12 +65,11 @@ class MainWindow(QMainWindow):
         right = QVBoxLayout()
         right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(0)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 0)
-        self.progress.setTextVisible(False)
-        self.progress.setFixedHeight(4)
-        self.progress.hide()
-        right.addWidget(self.progress)
+        self.progress = ProgressPanel()
+        holder = QVBoxLayout()
+        holder.setContentsMargins(28, 12, 28, 0)
+        holder.addWidget(self.progress)
+        right.addLayout(holder)
         self.stack = QStackedWidget()
         right.addWidget(self.stack, 1)
         self.status = QLabel("")
@@ -96,7 +95,7 @@ class MainWindow(QMainWindow):
             else "Read-only mode\nFixes ask for permission"
         )
         self.ctl.busy_changed.connect(self._busy)
-        self.ctl.progress.connect(self.status.setText)
+        self.ctl.progress.connect(self._progress)
         self.ctl.error.connect(self._error)
         self.ctl.scan_finished.connect(
             lambda r: self.status.setText(f"Scan finished in {r.duration:.0f} s.")
@@ -116,8 +115,15 @@ class MainWindow(QMainWindow):
         self.nav.addItem(QListWidgetItem(name))
 
     def _busy(self, busy: bool, text: str) -> None:
-        self.progress.setVisible(busy)
-        if text:
+        if busy:
+            self.progress.start(text or "Working…", self.ctl.task_steps, self.ctl.task_typical)
+            self.status.setText(text)
+        else:
+            self.progress.finish()
+
+    def _progress(self, text: str) -> None:
+        self.progress.update_text(text)
+        if not text.startswith("✓"):
             self.status.setText(text)
 
     def _error(self, text: str) -> None:
