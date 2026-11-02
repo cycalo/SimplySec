@@ -19,3 +19,10 @@ dist/
 
 # v1 runtime leftovers (kept locally, never committed)
 legacy/v1-artifacts/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/

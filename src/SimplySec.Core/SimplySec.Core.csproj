@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure logic: net10.0 (not -windows), so the compiler keeps OS access out of the core. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SimplySec.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Tomlyn" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Fluid.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Single source of truth during the port: the Python v2 knowledge base and resources. -->
+    <EmbeddedResource Include="..\simplysec\core\knowledge\*.toml" LogicalName="knowledge/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\simplysec\resources\oui.csv.gz" LogicalName="resources/oui.csv.gz" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SimplySec.Core.Tests" />
+  </ItemGroup>
+</Project>
