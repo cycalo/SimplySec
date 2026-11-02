@@ -42,7 +42,7 @@ def main() -> int:
         raw = Path(sys.argv[1]).read_bytes()
     else:
         req = urllib.request.Request(URL, headers={"User-Agent": "SimplySec OUI refresh"})
-        with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 - fixed https URL
+        with urllib.request.urlopen(req, timeout=120) as resp:
             raw = resp.read()
     rows = convert(raw)
     if len(rows) < 10000:

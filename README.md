@@ -39,6 +39,21 @@ py -3.11 -m venv .venv
 .venv\Scripts\python -m simplysec scan       # CLI, read-only
 ```
 
+## Standalone .exe
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptsuild.ps1
+```
+
+This builds `dist\SimplySec\` (a windowed `SimplySec.exe` and a console `simplysec-cli.exe`
+side by side) and `dist\SimplySec-<version>-win64.zip`. The knowledge base, `facts.ps1`, the
+OUI vendor list, report template and icon are bundled. The exe runs as the invoking user
+(read-only mode) and asks for administrator permission only when you apply or undo a change.
+
+The executables are **not code-signed**, so Windows SmartScreen will warn the first time you
+run them ("Windows protected your PC" > More info > Run anyway). nmap is never bundled; install
+it yourself if you want the optional deep network scan.
+
 ## Command line
 
 ```
