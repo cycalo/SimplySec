@@ -77,3 +77,42 @@ def test_fix_needs_admin(fake_engine, monkeypatch, capsys):
 def test_changes_empty(capsys):
     assert cli.main(["changes"]) == 0
     assert "has not changed anything" in capsys.readouterr().out
+
+
+def test_fix_flow_end_to_end_with_fakes(monkeypatch, this_pc_raw, tmp_path, capsys):
+    from simplysec.core.actions import Adapters
+    from simplysec.core.journal import Journal
+    from tests.unit.test_engine_undo import FakeFirewall, FakeRegistry, FakeSystem
+
+    registry = FakeRegistry()
+    path = r"HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance"
+    registry.values[(path, "fAllowToGetHelp")] = ("REG_DWORD", 1)
+    adapters = Adapters(FakeFirewall(), registry, None, None, FakeSystem(), None)
+
+    def make():
+        return engine_mod.Engine(
+            adapters=adapters,
+            journal=Journal(tmp_path / "j.db"),
+            collector=lambda progress=None: this_pc_raw,
+            is_admin=lambda: True,
+            backups_dir=tmp_path,
+        )
+
+    monkeypatch.setattr(cli, "_engine", make)
+    monkeypatch.setattr(cli.elevation, "is_admin", lambda: True)
+    code = cli.main(
+        [
+            "fix",
+            "--finding",
+            "rdp.remote_assistance_on",
+            "--fix",
+            "rdp.remote_assistance_off",
+            "--yes",
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "SimplySec will make these changes" in out and "What might stop working" in out
+    assert "Verified ✓" in out
+    # The fixture doesn't change, so the fresh scan honestly still reports the finding.
+    assert "STILL PRESENT" in out and code == cli.EXIT_FAIL
+    assert registry.values[(path, "fAllowToGetHelp")] == ("REG_DWORD", 0)
