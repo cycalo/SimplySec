@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self.ctl.busy_changed.connect(self._busy)
         self.ctl.progress.connect(self._progress)
         self.ctl.error.connect(self._error)
+        self.ctl.show_finding.connect(self._show_finding)
         self.ctl.scan_finished.connect(
             lambda r: self.status.setText(f"Scan finished in {r.duration:.0f} s.")
         )
@@ -129,6 +130,11 @@ class MainWindow(QMainWindow):
     def _error(self, text: str) -> None:
         self.status.setText(text)
         QMessageBox.warning(self, "SimplySec", text)
+
+    def _show_finding(self, finding: object) -> None:
+        self.go("This PC")
+        page = self.pages["This PC"]
+        page.show_finding(getattr(finding, "id", ""))  # type: ignore[attr-defined]
 
     def go(self, name: str) -> None:
         names = list(self.pages)

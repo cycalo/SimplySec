@@ -20,9 +20,12 @@ STATUS_TEXT = {
 
 
 class FindingCard(QFrame):
+    """``compact`` (Overview): title, what it means, Fix, Keep and a link to the full card."""
+
     fix_requested = Signal(object, object)  # Finding, FixOption
     keep_requested = Signal(object)  # Finding
     unkeep_requested = Signal(object)  # Finding
+    details_requested = Signal(object)  # Finding: open the full card on This PC
 
     def __init__(
         self, finding: Finding, parent: QWidget | None = None, compact: bool = False
@@ -53,10 +56,9 @@ class FindingCard(QFrame):
             head.addWidget(st, 0, Qt.AlignmentFlag.AlignTop)
         outer.addLayout(head)
 
+        what = label(f"<b>What this means:</b> {html.escape(finding.what_it_means)}", rich=True)
+        outer.addWidget(what)
         if not compact:
-            what = label(f"<b>What this means:</b> {html.escape(finding.what_it_means)}", rich=True)
-            outer.addWidget(what)
-
             self.details = label(self._details_html(), rich=True)
             self.details.setObjectName("Dim")
             self.details.setVisible(False)
@@ -84,7 +86,14 @@ class FindingCard(QFrame):
             unkeep.setText("Score again")
             unkeep.clicked.connect(lambda: self.unkeep_requested.emit(self.finding))
             buttons.addWidget(unkeep)
-        if not compact:
+        if compact:
+            more_btn = QToolButton()
+            more_btn.setObjectName("Link")
+            more_btn.setText("More details")
+            more_btn.setToolTip("Open this finding on the This PC page, with technical details")
+            more_btn.clicked.connect(lambda: self.details_requested.emit(self.finding))
+            buttons.addWidget(more_btn)
+        else:
             if finding.details:
                 tech = QToolButton()
                 tech.setObjectName("Link")

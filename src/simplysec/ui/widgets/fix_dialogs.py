@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from ...core.checks.base import Warning_
 from ...core.engine import Plan
+from ...core.models import Finding
 from . import label
 
 
@@ -29,7 +30,13 @@ class PreviewChoice:
 
 
 class PreviewDialog(QDialog):
-    def __init__(self, plan: Plan, is_admin: bool, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        plan: Plan,
+        is_admin: bool,
+        parent: QWidget | None = None,
+        findings: dict[str, Finding] | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Review changes")
         self.setMinimumWidth(620)
@@ -45,6 +52,14 @@ class PreviewDialog(QDialog):
         bl.setContentsMargins(0, 0, 0, 0)
         seen_offers: set[str] = set()
         for item in plan.items:
+            finding = (findings or {}).get(item.finding_id or "")
+            if finding is not None:
+                why = label(
+                    f"<b>Why:</b> {html.escape(finding.title)}. {html.escape(finding.what_it_means)}",
+                    rich=True,
+                )
+                why.setObjectName("Banner")
+                bl.addWidget(why)
             bl.addWidget(
                 label(
                     f"<b>{html.escape(item.fix.label)}</b> – {html.escape(item.fix.description)}",

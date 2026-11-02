@@ -33,6 +33,7 @@ class Controller(QObject):
     scan_finished = Signal(object)  # ScanResult
     changes_updated = Signal()
     error = Signal(str)
+    show_finding = Signal(object)  # Finding: navigate to its full card
 
     def __init__(self, parent_widget: QWidget) -> None:
         super().__init__(parent_widget)
@@ -248,7 +249,8 @@ class Controller(QObject):
                 self.window, "Can't apply", "\n".join(plan.refused) or "Nothing to apply."
             )
             return
-        dlg = PreviewDialog(plan, self.is_admin, self.window)
+        findings = {f.id: f for f in (self.result.findings if self.result else [])}
+        dlg = PreviewDialog(plan, self.is_admin, self.window, findings)
         dlg.exec()
         choice = dlg.choice()
         if not choice.accepted:

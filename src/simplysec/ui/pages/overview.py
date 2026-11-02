@@ -132,6 +132,7 @@ class OverviewPage(Page):
             c = FindingCard(f, compact=True)
             c.fix_requested.connect(self.ctl.request_fix)
             c.keep_requested.connect(self.ctl.keep)
+            c.details_requested.connect(self.ctl.show_finding.emit)
             self.top_box.addWidget(c)
 
         self.clear(self.changes_layout)
