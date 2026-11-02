@@ -5,12 +5,14 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -55,11 +57,7 @@ class MainWindow(QMainWindow):
         self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         left.addWidget(self.nav, 1)
-        self.mode = QLabel()
-        self.mode.setObjectName("Dim")
-        self.mode.setWordWrap(True)
-        self.mode.setContentsMargins(16, 8, 16, 14)
-        left.addWidget(self.mode)
+        left.addWidget(self._mode_badge())
         root.addLayout(left)
 
         right = QVBoxLayout()
@@ -89,11 +87,6 @@ class MainWindow(QMainWindow):
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.setCurrentRow(0)
 
-        self.mode.setText(
-            "Administrator mode"
-            if elevation.is_admin()
-            else "Read-only mode\nFixes ask for permission"
-        )
         self.ctl.busy_changed.connect(self._busy)
         self.ctl.progress.connect(self._progress)
         self.ctl.error.connect(self._error)
@@ -108,6 +101,45 @@ class MainWindow(QMainWindow):
         from .pages.history import HistoryPage
 
         self.add_page("History", HistoryPage(self.ctl))
+
+    def _mode_badge(self) -> QWidget:
+        """Bottom-left status: a coloured mode pill, and 'Restart as administrator' if needed."""
+        admin = elevation.is_admin()
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(14, 8, 14, 14)
+        lay.setSpacing(6)
+        color = "#0F7B0F" if admin else "#B76E00"
+        text = "Administrator mode" if admin else "Read-only mode"
+        pill = QLabel(text)
+        pill.setStyleSheet(
+            f"background:{color}; color:white; font-weight:600; border-radius:10px; padding:4px 10px;"
+        )
+        pill.setToolTip(
+            "Fixes and undo apply directly."
+            if admin
+            else "Scans work fully. Applying or undoing a fix asks Windows for permission each time."
+        )
+        lay.addWidget(pill)
+        if not admin:
+            hint = QLabel("Fixes ask for permission")
+            hint.setObjectName("Dim")
+            lay.addWidget(hint)
+            btn = QPushButton("Restart as administrator")
+            btn.clicked.connect(self.restart_as_admin)
+            lay.addWidget(btn)
+        return box
+
+    def restart_as_admin(self) -> None:
+        if self.ctl.busy:
+            QMessageBox.information(self, "Busy", "Wait for the current task to finish first.")
+            return
+        if elevation.relaunch_elevated([], gui=True):
+            QApplication.quit()
+        else:
+            QMessageBox.information(
+                self, "Not restarted", "Administrator permission was not given."
+            )
 
     def add_page(self, name: str, page: QWidget) -> None:
         self.pages[name] = page
