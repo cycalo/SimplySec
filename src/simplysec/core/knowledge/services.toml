@@ -1,0 +1,290 @@
+# Windows services that host listeners, described in plain words.
+#
+# Fields
+#   name         service name (case-insensitive)
+#   display      friendly name
+#   description  plain sentence
+#   risk         starting risk when reachable on a Public network (overrides the port's
+#                dynamic-range default for services on random RPC ports)
+#   never_touch  true: SimplySec never stops, disables or reconfigures this service
+#                (from v1's critical-services list, extended)
+
+[[service]]
+name = "RpcSs"
+display = "Remote Procedure Call (RPC)"
+description = "Core Windows plumbing that lets programs and services talk to each other."
+risk = "high"
+never_touch = true
+
+[[service]]
+name = "RpcEptMapper"
+display = "RPC Endpoint Mapper"
+description = "Tells other computers which remote management services this PC offers."
+risk = "high"
+never_touch = true
+
+[[service]]
+name = "DcomLaunch"
+display = "DCOM Server Process Launcher"
+description = "Starts Windows components on demand."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "LanmanServer"
+display = "Server (file and printer sharing)"
+description = "Shares this PC's folders and printers with the network."
+risk = "high"
+
+[[service]]
+name = "LanmanWorkstation"
+display = "Workstation"
+description = "Lets this PC open shared folders on other computers."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "CDPSvc"
+display = "Connected Devices Platform"
+description = "Nearby sharing, Phone Link and syncing with your other devices."
+risk = "low"
+
+[[service]]
+name = "Dnscache"
+display = "DNS Client"
+description = "Looks up website names; also answers LLMNR and mDNS name lookups."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "SSDPSRV"
+display = "SSDP Discovery"
+description = "Finds UPnP devices such as smart TVs and speakers."
+risk = "low"
+
+[[service]]
+name = "upnphost"
+display = "UPnP Device Host"
+description = "Lets this PC act as a UPnP device (media sharing)."
+risk = "low"
+
+[[service]]
+name = "FDResPub"
+display = "Function Discovery Resource Publication"
+description = "Makes this PC visible under File Explorer > Network."
+risk = "low"
+
+[[service]]
+name = "fdPHost"
+display = "Function Discovery Provider Host"
+description = "Discovers printers, scanners and other PCs."
+risk = "low"
+
+[[service]]
+name = "IKEEXT"
+display = "IKE and AuthIP IPsec Keying Modules"
+description = "Sets up encrypted VPN and IPsec connections."
+risk = "low"
+
+[[service]]
+name = "PolicyAgent"
+display = "IPsec Policy Agent"
+description = "Applies IPsec settings."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "iphlpsvc"
+display = "IP Helper"
+description = "IPv6 transition technologies and IP-HTTPS."
+risk = "low"
+
+[[service]]
+name = "TermService"
+display = "Remote Desktop Services"
+description = "Lets people log in to this PC over the network with Remote Desktop."
+risk = "high"
+
+[[service]]
+name = "WinRM"
+display = "Windows Remote Management"
+description = "Remote PowerShell management."
+risk = "high"
+
+[[service]]
+name = "Spooler"
+display = "Print Spooler"
+description = "Manages printing; also shares printers with the network."
+risk = "medium"
+
+[[service]]
+name = "DoSvc"
+display = "Delivery Optimization"
+description = "Shares Windows Update downloads with other PCs."
+risk = "low"
+
+[[service]]
+name = "EventLog"
+display = "Windows Event Log"
+description = "Records system events."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "Schedule"
+display = "Task Scheduler"
+description = "Runs scheduled tasks."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "W32Time"
+display = "Windows Time"
+description = "Keeps the clock accurate."
+risk = "low"
+
+[[service]]
+name = "Dhcp"
+display = "DHCP Client"
+description = "Gets this PC's network address from the router."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "nsi"
+display = "Network Store Interface"
+description = "Core networking."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "Tcpip"
+display = "TCP/IP"
+description = "Core networking."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "Netlogon"
+display = "Netlogon"
+description = "Signs in to company domains."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "WinDefend"
+display = "Microsoft Defender Antivirus"
+description = "Windows' built-in antivirus."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "wscsvc"
+display = "Security Center"
+description = "Monitors antivirus, firewall and update status."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "wuauserv"
+display = "Windows Update"
+description = "Installs updates."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "mpssvc"
+display = "Windows Defender Firewall"
+description = "The firewall itself. SimplySec never stops or restarts it."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "BFE"
+display = "Base Filtering Engine"
+description = "The engine under the firewall."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "SamSs"
+display = "Security Accounts Manager"
+description = "Stores local user accounts."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "KeyIso"
+display = "CNG Key Isolation"
+description = "Protects encryption keys."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "lmhosts"
+display = "TCP/IP NetBIOS Helper"
+description = "Old NetBIOS name support."
+risk = "low"
+
+[[service]]
+name = "RemoteRegistry"
+display = "Remote Registry"
+description = "Lets other computers read and change this PC's settings."
+risk = "high"
+
+[[service]]
+name = "SharedAccess"
+display = "Internet Connection Sharing"
+description = "Shares this PC's internet connection (Mobile Hotspot)."
+risk = "low"
+
+[[service]]
+name = "vmms"
+display = "Hyper-V Virtual Machine Management"
+description = "Manages Hyper-V virtual machines."
+risk = "low"
+
+[[service]]
+name = "WMPNetworkSvc"
+display = "Windows Media Player Network Sharing"
+description = "Shares your media library with TVs and consoles."
+risk = "low"
+
+[[service]]
+name = "NlaSvc"
+display = "Network Location Awareness"
+description = "Decides whether a network is Public or Private."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "Winmgmt"
+display = "Windows Management Instrumentation"
+description = "Core Windows management."
+risk = "medium"
+never_touch = true
+
+[[service]]
+name = "gpsvc"
+display = "Group Policy Client"
+description = "Applies policies."
+risk = "low"
+never_touch = true
+
+[[service]]
+name = "TlntSvr"
+display = "Telnet server"
+description = "Old unencrypted remote access."
+risk = "critical"
+
+[[service]]
+name = "FTPSVC"
+display = "Microsoft FTP Service"
+description = "IIS FTP server."
+risk = "high"
+
+[[service]]
+name = "SNMP"
+display = "SNMP Service"
+description = "Network monitoring agent."
+risk = "medium"

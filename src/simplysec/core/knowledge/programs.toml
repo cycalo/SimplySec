@@ -1,0 +1,277 @@
+# Known programs that open network ports, described in neutral words.
+#
+# Findings about these programs are about WHO CAN REACH THEM, never about the program being
+# bad. `risk` is the starting risk when other devices on a Public network can reach it.
+#
+# Fields
+#   id           stable id
+#   exe          lower-case image names
+#   name         product name
+#   description  neutral phrase used in titles, e.g. "Ollama, your local AI model server"
+#   risk         info | low | medium | high | critical
+#   explain      what it means when other devices can reach it
+#   intent_env   optional environment variable whose value shows the user chose to expose it
+#                (a non-loopback bind address such as 0.0.0.0 means "you set this up")
+#   ports        ports the program normally uses (informational)
+
+[[program]]
+id = "ollama"
+exe = ["ollama.exe", "ollama app.exe"]
+name = "Ollama"
+description = "Ollama, your local AI model server"
+risk = "medium"
+explain = "The Ollama API has no password: whoever can reach it can use your models and list or download them."
+intent_env = "OLLAMA_HOST"
+ports = [11434]
+
+[[program]]
+id = "cursor"
+exe = ["cursor.exe"]
+name = "Cursor"
+description = "Cursor, your code editor"
+risk = "medium"
+explain = "Cursor opens ports for development servers and port forwarding. These usually have no login, so whoever can reach them can see what they serve."
+ports = [3000]
+
+[[program]]
+id = "vscode"
+exe = ["code.exe"]
+name = "Visual Studio Code"
+description = "Visual Studio Code, your code editor"
+risk = "medium"
+explain = "VS Code opens ports for development servers and port forwarding, which usually have no login."
+
+[[program]]
+id = "spotify"
+exe = ["spotify.exe", "spotifylauncher.exe"]
+name = "Spotify"
+description = "Spotify, your music app"
+risk = "low"
+explain = "Spotify Connect uses this port so your phone and speakers on the same network can find and control playback."
+
+[[program]]
+id = "tailscale"
+exe = ["tailscaled.exe", "tailscale-ipn.exe", "tailscale.exe"]
+name = "Tailscale"
+description = "Tailscale, your private VPN"
+risk = "info"
+explain = "Tailscale only accepts encrypted connections from devices in your own Tailscale network."
+
+[[program]]
+id = "adb"
+exe = ["adb.exe"]
+name = "Android Debug Bridge"
+description = "Android Debug Bridge (Android developer tools)"
+risk = "medium"
+explain = "adb controls Android phones connected to this PC. If others could reach it they could control those phones."
+ports = [5037]
+
+[[program]]
+id = "vmware"
+exe = ["vmware-authd.exe", "vmnat.exe", "vmnetdhcp.exe", "vmware.exe", "vmware-hostd.exe", "vmware-vmx.exe"]
+name = "VMware Workstation"
+description = "VMware Workstation, your virtual-machine software"
+risk = "low"
+explain = "VMware uses these ports for its virtual networks and remote consoles."
+ports = [902, 912]
+
+[[program]]
+id = "browser"
+exe = ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe"]
+name = "Web browser"
+description = "your web browser"
+risk = "info"
+explain = "Browsers listen for Chromecast, AirPlay and other devices (mDNS) and for WebRTC calls. This is normal."
+
+[[program]]
+id = "claude"
+exe = ["claude.exe"]
+name = "Claude"
+description = "the Claude desktop app"
+risk = "info"
+explain = "Used by the app for its own network traffic (for example voice calls)."
+
+[[program]]
+id = "nvidia"
+exe = ["nvcontainer.exe", "nvidia overlay.exe", "nvidia share.exe", "nvidia web helper.exe"]
+name = "NVIDIA app"
+description = "the NVIDIA app"
+risk = "low"
+explain = "NVIDIA's background services talk to each other on this PC."
+
+[[program]]
+id = "lghub"
+exe = ["lghub_agent.exe", "lghub_updater.exe", "lghub.exe"]
+name = "Logitech G HUB"
+description = "Logitech G HUB"
+risk = "low"
+explain = "G HUB's background services talk to each other on this PC."
+
+[[program]]
+id = "native-instruments"
+exe = ["ntkdaemon.exe", "native access.exe"]
+name = "Native Instruments"
+description = "a Native Instruments background service"
+risk = "low"
+explain = "Background service for Native Instruments music software."
+
+[[program]]
+id = "google-drive"
+exe = ["googledrivefs.exe"]
+name = "Google Drive"
+description = "Google Drive for desktop"
+risk = "low"
+explain = "Drive's background sync talks to its own components on this PC."
+
+[[program]]
+id = "onedrive"
+exe = ["onedrive.exe"]
+name = "OneDrive"
+description = "Microsoft OneDrive"
+risk = "low"
+explain = "OneDrive sync."
+
+[[program]]
+id = "dropbox"
+exe = ["dropbox.exe"]
+name = "Dropbox"
+description = "Dropbox"
+risk = "low"
+explain = "Dropbox LAN sync lets other computers on your network share file downloads."
+
+[[program]]
+id = "steam"
+exe = ["steam.exe", "steamwebhelper.exe", "steamservice.exe"]
+name = "Steam"
+description = "Steam, your game launcher"
+risk = "low"
+explain = "Steam uses these ports for in-home streaming and sharing game downloads on your network."
+
+[[program]]
+id = "discord"
+exe = ["discord.exe"]
+name = "Discord"
+description = "Discord"
+risk = "low"
+explain = "Used for voice and video calls."
+
+[[program]]
+id = "zoom"
+exe = ["zoom.exe"]
+name = "Zoom"
+description = "Zoom"
+risk = "low"
+explain = "Used for calls."
+
+[[program]]
+id = "teams"
+exe = ["ms-teams.exe", "teams.exe"]
+name = "Microsoft Teams"
+description = "Microsoft Teams"
+risk = "low"
+explain = "Used for calls."
+
+[[program]]
+id = "plex"
+exe = ["plex media server.exe"]
+name = "Plex Media Server"
+description = "Plex Media Server"
+risk = "low"
+explain = "Streams your media library to your devices; Plex requires a sign-in."
+ports = [32400]
+
+[[program]]
+id = "docker"
+exe = ["com.docker.backend.exe", "dockerd.exe", "docker desktop.exe", "com.docker.proxy.exe", "wslrelay.exe"]
+name = "Docker / WSL"
+description = "Docker or WSL, forwarding a container's port"
+risk = "medium"
+explain = "This forwards a port from a container or Linux environment. Whatever runs there is reachable through it."
+
+[[program]]
+id = "python"
+exe = ["python.exe", "pythonw.exe", "py.exe"]
+name = "Python"
+description = "a Python program"
+risk = "medium"
+explain = "A Python script is running a server. Test servers rarely have a login."
+
+[[program]]
+id = "node"
+exe = ["node.exe", "bun.exe", "deno.exe"]
+name = "Node.js"
+description = "a Node.js program (often a development server)"
+risk = "medium"
+explain = "A JavaScript runtime is running a server. Development servers rarely have a login."
+
+[[program]]
+id = "java"
+exe = ["java.exe", "javaw.exe"]
+name = "Java"
+description = "a Java program"
+risk = "medium"
+explain = "A Java program is running a server (for example a Minecraft server)."
+
+[[program]]
+id = "anydesk"
+exe = ["anydesk.exe"]
+name = "AnyDesk"
+description = "AnyDesk remote control"
+risk = "medium"
+explain = "Remote-control software: whoever can connect and log in can control this PC."
+
+[[program]]
+id = "teamviewer"
+exe = ["teamviewer.exe", "teamviewer_service.exe"]
+name = "TeamViewer"
+description = "TeamViewer remote control"
+risk = "medium"
+explain = "Remote-control software: whoever can connect and log in can control this PC."
+
+[[program]]
+id = "rustdesk"
+exe = ["rustdesk.exe"]
+name = "RustDesk"
+description = "RustDesk remote control"
+risk = "medium"
+explain = "Remote-control software: whoever can connect and log in can control this PC."
+
+[[program]]
+id = "sunshine"
+exe = ["sunshine.exe", "parsecd.exe"]
+name = "Game streaming host"
+description = "a game-streaming host (Sunshine or Parsec)"
+risk = "medium"
+explain = "Streams this PC's screen and accepts keyboard and mouse input from paired devices."
+
+[[program]]
+id = "torrent"
+exe = ["qbittorrent.exe", "utorrent.exe", "bittorrent.exe", "transmission-qt.exe", "deluge.exe"]
+name = "BitTorrent client"
+description = "a BitTorrent client"
+risk = "low"
+explain = "Torrent apps accept connections from other peers; they see your IP address."
+
+[[program]]
+id = "syncthing"
+exe = ["syncthing.exe"]
+name = "Syncthing"
+description = "Syncthing file sync"
+risk = "low"
+explain = "Syncs folders with your other devices; only paired devices can exchange files."
+
+[[program]]
+id = "webserver"
+exe = ["httpd.exe", "nginx.exe", "caddy.exe", "w3wp.exe"]
+name = "Web server"
+description = "a web server"
+risk = "medium"
+explain = "A web server is publishing pages from this PC."
+
+[[program]]
+id = "database"
+exe = ["mysqld.exe", "mariadbd.exe", "postgres.exe", "redis-server.exe", "mongod.exe", "sqlservr.exe"]
+name = "Database server"
+description = "a database server"
+risk = "high"
+explain = "Databases hold valuable data and are attacked with password guessing."

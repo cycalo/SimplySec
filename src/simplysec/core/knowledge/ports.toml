@@ -1,0 +1,937 @@
+# SimplySec port knowledge: the single source of truth.
+#
+# Texts describe what it means when THIS PC listens on the port (v1 described client use,
+# which was misleading). `risk` is the risk when other devices on a Public network can reach
+# it; scoring lowers it for Private networks and VPN-only exposure.
+#
+# Fields
+#   port, protocol   tcp | udp
+#   name             short name shown in tables
+#   risk             info | low | medium | high | critical
+#   summary          one plain sentence: what this is
+#   explain          what it means if other devices can reach it
+#   advice           what to do
+#   topic            optional link to a check module (rdp, smb, netbios, llmnr, wsd, rpc, winrm)
+#   kernel           true: Windows itself (PID 4, "System") listens; identified by port
+#   service          Windows service behind it, when known
+#   lan_probe        true: probed on other devices during a home-network scan (M2)
+#   discovery        true: a shared discovery protocol (mDNS, SSDP, WS-Discovery). Its risk
+#                    is the protocol's, whichever program uses it
+#   fixes            fix ids offered for this port (validated by tests)
+
+[[port]]
+port = 20
+protocol = "tcp"
+name = "FTP data"
+risk = "high"
+summary = "The data channel of an FTP file server."
+explain = "FTP sends files and passwords without encryption, so anyone on the network can read them."
+advice = "Turn off the FTP server if you don't use it, or switch to SFTP."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 21
+protocol = "tcp"
+name = "FTP"
+risk = "high"
+summary = "An FTP file server accepts logins on this port."
+explain = "FTP sends files and passwords without encryption, and FTP servers are scanned for constantly."
+advice = "Turn off the FTP server if you don't use it, or switch to SFTP."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 22
+protocol = "tcp"
+name = "SSH"
+risk = "medium"
+summary = "An SSH server: encrypted remote command-line access to this PC."
+explain = "SSH is encrypted, but anyone who can reach it can try to guess passwords."
+advice = "Keep it only if you use it. Prefer key-based login and turn off password login."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 23
+protocol = "tcp"
+name = "Telnet"
+risk = "critical"
+summary = "A Telnet server: old, unencrypted remote access."
+explain = "Telnet sends everything, including passwords, as plain text. Anyone on the network can take over the session."
+advice = "Turn it off. Use SSH instead."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 25
+protocol = "tcp"
+name = "SMTP"
+risk = "medium"
+summary = "A mail server that accepts email."
+explain = "A mail server reachable by others can be abused to send spam if it is not configured carefully."
+advice = "Only run a mail server if you meant to."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 53
+protocol = "tcp"
+name = "DNS server"
+risk = "medium"
+summary = "A DNS server: it answers name lookups for other devices."
+explain = "An open DNS server can be abused to attack others. Most PCs never need one."
+advice = "Turn it off unless this PC is meant to be your network's DNS server."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 53
+protocol = "udp"
+name = "DNS server"
+risk = "medium"
+summary = "A DNS server: it answers name lookups for other devices."
+explain = "An open DNS server can be abused to attack others. Most PCs never need one."
+advice = "Turn it off unless this PC is meant to be your network's DNS server."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 67
+protocol = "udp"
+name = "DHCP server"
+risk = "low"
+summary = "Hands out IP addresses. On a PC this is usually virtual-machine or hotspot software."
+explain = "A second DHCP server can confuse other devices on the network."
+advice = "Fine if it belongs to VMware, Hyper-V or Mobile Hotspot."
+fixes = ["exposure.block_program"]
+
+[[port]]
+port = 69
+protocol = "udp"
+name = "TFTP"
+risk = "high"
+summary = "A TFTP file server, with no passwords at all."
+explain = "Anyone who can reach it can download (and often upload) files."
+advice = "Turn it off unless you are updating a router or phone right now."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 80
+protocol = "tcp"
+name = "Web server (HTTP)"
+risk = "medium"
+summary = "A web server without encryption."
+explain = "Other devices can open whatever this web server shows. Logins over plain HTTP can be read on the network."
+advice = "Check which program runs it. Keep it only if you meant to share a website or device panel."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 110
+protocol = "tcp"
+name = "POP3"
+risk = "medium"
+summary = "A mail server for downloading email, without encryption."
+explain = "Passwords and email are sent as plain text."
+advice = "Use POP3S (995) or turn it off."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 111
+protocol = "tcp"
+name = "RPCbind"
+risk = "medium"
+summary = "Unix service directory (portmapper), usually from NFS software."
+explain = "It tells other devices which file-sharing services run here."
+advice = "Turn off NFS software you don't use."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 123
+protocol = "udp"
+name = "NTP"
+risk = "low"
+summary = "Time synchronisation."
+explain = "A time server reachable from the internet can be abused for traffic floods."
+advice = "Nothing to do on a normal PC."
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 135
+protocol = "tcp"
+name = "RPC endpoint mapper"
+risk = "high"
+summary = "Windows' directory of remote management services (RPC)."
+explain = "Windows uses it for remote management. Worms have used it in the past; it should never be reachable from public networks."
+advice = "Keep it blocked on Public networks. It is needed on company networks, rarely at home."
+topic = "rpc"
+service = "RpcEptMapper"
+lan_probe = true
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 137
+protocol = "udp"
+name = "NetBIOS name service"
+risk = "medium"
+summary = "Old Windows name lookup (NetBIOS)."
+explain = "It answers who-is questions about this PC's name. Attackers on the same network can abuse it to trick your PC into sending login hashes."
+advice = "Turn NetBIOS off unless you have very old network devices."
+topic = "netbios"
+kernel = true
+fixes = ["legacy.netbios_off", "exposure.block_port"]
+
+[[port]]
+port = 138
+protocol = "udp"
+name = "NetBIOS datagram"
+risk = "medium"
+summary = "Old Windows network browsing (NetBIOS)."
+explain = "Used by very old Windows networking to announce computers. Leaks this PC's name and workgroup."
+advice = "Turn NetBIOS off unless you have very old network devices."
+topic = "netbios"
+kernel = true
+fixes = ["legacy.netbios_off", "exposure.block_port"]
+
+[[port]]
+port = 139
+protocol = "tcp"
+name = "NetBIOS session (old file sharing)"
+risk = "high"
+summary = "Old Windows file and printer sharing over NetBIOS."
+explain = "Gives access to shared files and printers the old way. Modern Windows uses port 445 instead."
+advice = "Turn NetBIOS off unless you have very old network devices."
+topic = "netbios"
+kernel = true
+lan_probe = true
+fixes = ["legacy.netbios_off", "exposure.block_port"]
+
+[[port]]
+port = 143
+protocol = "tcp"
+name = "IMAP"
+risk = "medium"
+summary = "A mail server for syncing email, without encryption."
+explain = "Passwords and email are sent as plain text."
+advice = "Use IMAPS (993) or turn it off."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 161
+protocol = "udp"
+name = "SNMP"
+risk = "medium"
+summary = "Device monitoring (SNMP)."
+explain = "With the default password ('public') it reveals detailed information about this PC."
+advice = "Turn off the SNMP service if you don't use network monitoring."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 389
+protocol = "tcp"
+name = "LDAP"
+risk = "medium"
+summary = "A directory server (LDAP), normally only on company servers."
+explain = "It can reveal user and computer names."
+advice = "Unexpected on a home PC. Check which program runs it."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 443
+protocol = "tcp"
+name = "Web server (HTTPS)"
+risk = "low"
+summary = "An encrypted web server."
+explain = "Encryption protects the traffic, but other devices can still open whatever this server shows."
+advice = "Check which program runs it. Keep it only if you meant to share it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 445
+protocol = "tcp"
+name = "SMB (Windows file sharing)"
+risk = "high"
+summary = "Windows file and printer sharing."
+explain = "Other devices can try to open shared folders and printers. SMB is the favourite target of ransomware worms and must never be reachable on public networks."
+advice = "Keep it blocked on Public networks. On your home network it is fine if you share files."
+topic = "smb"
+kernel = true
+service = "LanmanServer"
+lan_probe = true
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 500
+protocol = "udp"
+name = "IPsec key exchange (IKE)"
+risk = "low"
+summary = "Used by Windows' built-in VPN and IPsec."
+explain = "Normal on Windows. It only answers proper VPN handshakes."
+advice = "Nothing to do."
+service = "IKEEXT"
+fixes = []
+
+[[port]]
+port = 548
+protocol = "tcp"
+name = "AFP (Apple file sharing)"
+risk = "medium"
+summary = "Apple's old file-sharing protocol."
+explain = "Gives access to shared folders on a Mac or NAS."
+advice = "Check that shared folders need a password."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 554
+protocol = "tcp"
+name = "RTSP (video streams)"
+risk = "medium"
+summary = "Live video streaming, typical for security cameras."
+explain = "Cameras often stream without a password, so anyone on the network can watch."
+advice = "Set a password for the camera stream."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 631
+protocol = "tcp"
+name = "IPP (printing)"
+risk = "low"
+summary = "Internet Printing Protocol: network printing."
+explain = "Others can send print jobs and read the printer's status."
+advice = "Normal for printers. Unusual for a PC unless it shares a printer."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 873
+protocol = "tcp"
+name = "rsync"
+risk = "high"
+summary = "rsync file synchronisation server."
+explain = "Often configured without a password, exposing whole folders."
+advice = "Require a password or turn it off."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 902
+protocol = "tcp"
+name = "VMware authorisation"
+risk = "medium"
+summary = "VMware Workstation's remote console service."
+explain = "Lets other computers connect to your virtual machines' consoles if they have a login."
+advice = "Fine when only this PC can reach it."
+fixes = ["exposure.block_program"]
+
+[[port]]
+port = 1080
+protocol = "tcp"
+name = "SOCKS proxy"
+risk = "high"
+summary = "A proxy server that forwards traffic for others."
+explain = "An open proxy lets others hide their traffic behind your internet connection."
+advice = "Turn it off or limit it to this PC."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 1433
+protocol = "tcp"
+name = "Microsoft SQL Server"
+risk = "high"
+summary = "A Microsoft SQL Server database."
+explain = "Databases hold valuable data and are attacked with password guessing."
+advice = "Limit it to this PC unless other computers need the database."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 1521
+protocol = "tcp"
+name = "Oracle database"
+risk = "high"
+summary = "An Oracle database listener."
+explain = "Databases hold valuable data and are attacked with password guessing."
+advice = "Limit it to this PC unless other computers need the database."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 1723
+protocol = "tcp"
+name = "PPTP VPN"
+risk = "high"
+summary = "An old VPN server type with broken encryption."
+explain = "PPTP's encryption can be cracked; it should not be used any more."
+advice = "Switch to a modern VPN (WireGuard, OpenVPN, Tailscale) and turn PPTP off."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 1883
+protocol = "tcp"
+name = "MQTT"
+risk = "high"
+summary = "A smart-home message broker (MQTT), often without a password."
+explain = "Anyone who can connect may read and control smart-home devices."
+advice = "Require a password on the broker."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 1900
+protocol = "udp"
+discovery = true
+name = "SSDP (UPnP discovery)"
+risk = "low"
+summary = "Windows looks for smart TVs, speakers and other UPnP devices."
+explain = "Normal on home networks. It only announces and discovers devices."
+advice = "Nothing to do on a home network."
+service = "SSDPSRV"
+fixes = []
+
+[[port]]
+port = 2049
+protocol = "tcp"
+name = "NFS"
+risk = "high"
+summary = "Unix/Linux network file sharing."
+explain = "NFS often trusts any device on the network with shared folders."
+advice = "Limit shares to specific devices, or turn NFS off."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 2179
+protocol = "tcp"
+name = "Hyper-V VM connect"
+risk = "low"
+summary = "Hyper-V's virtual machine console (vmrdp)."
+explain = "Used to view your Hyper-V virtual machines. It requires a Windows login. (v1 mistook this for Remote Desktop.)"
+advice = "Fine if you use Hyper-V."
+service = "vmms"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 2375
+protocol = "tcp"
+name = "Docker API (unencrypted)"
+risk = "critical"
+summary = "Docker's control API without encryption or login."
+explain = "Anyone who can reach it can run any program on this PC with full rights."
+advice = "Turn off 'Expose daemon on tcp://localhost:2375 without TLS' or make sure only this PC can reach it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 2376
+protocol = "tcp"
+name = "Docker API (TLS)"
+risk = "medium"
+summary = "Docker's control API with encryption."
+explain = "Protected by certificates, but still powerful remote control."
+advice = "Keep only if you manage Docker remotely."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 2869
+protocol = "tcp"
+name = "UPnP device host"
+risk = "low"
+summary = "Windows shares media or acts as a UPnP device."
+explain = "Used for media streaming to TVs on the home network."
+advice = "Fine on a home network; should not be reachable on public networks."
+kernel = true
+service = "upnphost"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 3000
+protocol = "tcp"
+name = "Development web server"
+risk = "medium"
+summary = "Typical port for a web app you are developing (Node, React, Grafana…)."
+explain = "Development servers rarely have a login and may show unfinished work or debug tools."
+advice = "Fine for testing; limit it to this PC or your VPN when you don't need other devices."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 3306
+protocol = "tcp"
+name = "MySQL / MariaDB"
+risk = "high"
+summary = "A MySQL or MariaDB database."
+explain = "Databases hold valuable data and are attacked with password guessing."
+advice = "Limit it to this PC unless other computers need the database."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 3389
+protocol = "tcp"
+name = "Remote Desktop (RDP)"
+risk = "high"
+summary = "Windows Remote Desktop: full control of this PC over the network."
+explain = "Anyone who can reach it can try to log in. Remote Desktop is one of the most attacked services on the internet."
+advice = "Turn it off if you don't use it. If you do, require Network Level Authentication and only allow it on your home network or VPN."
+topic = "rdp"
+service = "TermService"
+lan_probe = true
+fixes = ["rdp.disable", "rdp.require_nla", "exposure.block_port"]
+
+[[port]]
+port = 3389
+protocol = "udp"
+name = "Remote Desktop (RDP over UDP)"
+risk = "high"
+summary = "The faster UDP channel of Windows Remote Desktop."
+explain = "Part of Remote Desktop; it matters only when Remote Desktop is on."
+advice = "Same as Remote Desktop over TCP."
+topic = "rdp"
+service = "TermService"
+fixes = ["rdp.disable", "exposure.block_port"]
+
+[[port]]
+port = 3702
+protocol = "udp"
+discovery = true
+name = "WS-Discovery"
+risk = "low"
+summary = "Windows discovers printers, scanners and other PCs on the network."
+explain = "Normal on home networks; it lets this PC appear in File Explorer > Network."
+advice = "Nothing to do. On public networks Windows keeps it hidden."
+service = "FDResPub"
+fixes = []
+
+[[port]]
+port = 4444
+protocol = "tcp"
+name = "Port 4444"
+risk = "high"
+summary = "Commonly used by hacking tools and some malware for remote control."
+explain = "A program you don't recognise listening here deserves a closer look."
+advice = "Check which program this is. If you don't know it, block it and scan with Windows Security."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 4500
+protocol = "udp"
+name = "IPsec NAT traversal"
+risk = "low"
+summary = "Used by Windows' built-in VPN and IPsec behind routers."
+explain = "Normal on Windows. It only answers proper VPN handshakes."
+advice = "Nothing to do."
+service = "IKEEXT"
+fixes = []
+
+[[port]]
+port = 5000
+protocol = "tcp"
+name = "Web app / UPnP"
+risk = "medium"
+summary = "Common for development servers (Flask), NAS admin pages and UPnP media servers."
+explain = "Often an admin panel or a development server with no login."
+advice = "Check which program runs it. Keep it only if other devices need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 5037
+protocol = "tcp"
+name = "Android Debug Bridge server"
+risk = "medium"
+summary = "Android developer tools (adb) talking to connected phones."
+explain = "If reachable from the network, others could control phones plugged into this PC."
+advice = "Fine when only this PC can reach it (the default)."
+fixes = ["exposure.block_program"]
+
+[[port]]
+port = 5040
+protocol = "tcp"
+name = "Connected Devices Platform"
+risk = "low"
+summary = "Windows' Connected Devices Platform (CDPSvc): Nearby sharing and Phone Link."
+explain = "Lets your phone and other PCs signed in to your account find this PC."
+advice = "Fine on a home network. On public networks it should be blocked."
+service = "CDPSvc"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 5050
+protocol = "udp"
+name = "Connected Devices Platform"
+risk = "low"
+summary = "Discovery for Windows' Connected Devices Platform (CDPSvc)."
+explain = "Lets your phone and other PCs signed in to your account find this PC."
+advice = "Nothing to do on a home network."
+service = "CDPSvc"
+fixes = []
+
+[[port]]
+port = 5353
+protocol = "udp"
+discovery = true
+name = "mDNS"
+risk = "info"
+summary = "Multicast DNS: finds Chromecasts, AirPlay speakers and printers on the network."
+explain = "Normal for browsers, Windows and media apps. It only announces and discovers devices."
+advice = "Nothing to do."
+fixes = []
+
+[[port]]
+port = 5355
+protocol = "udp"
+name = "LLMNR"
+risk = "medium"
+summary = "Link-Local Multicast Name Resolution: an old way to find PCs by name without DNS."
+explain = "An attacker on the same network can answer these lookups pretending to be another PC and capture your password hash."
+advice = "Turn LLMNR off; DNS and mDNS do the same job safely."
+topic = "llmnr"
+service = "Dnscache"
+fixes = ["legacy.llmnr_off"]
+
+[[port]]
+port = 5357
+protocol = "tcp"
+name = "WSD (Web Services on Devices)"
+risk = "low"
+summary = "Windows' device discovery API (WSD), used by Network discovery and network scanners/printers."
+explain = "Lets other PCs see this one under File Explorer > Network. (v1 wrongly called this WinRM.)"
+advice = "Fine on a home network. It should be blocked on public networks."
+topic = "wsd"
+kernel = true
+service = "FDResPub"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 5358
+protocol = "tcp"
+name = "WSD (secure)"
+risk = "low"
+summary = "Encrypted version of Windows' device discovery API."
+explain = "Lets other PCs see this one under File Explorer > Network."
+advice = "Fine on a home network."
+topic = "wsd"
+kernel = true
+service = "FDResPub"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 5432
+protocol = "tcp"
+name = "PostgreSQL"
+risk = "high"
+summary = "A PostgreSQL database."
+explain = "Databases hold valuable data and are attacked with password guessing."
+advice = "Limit it to this PC unless other computers need the database."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 5555
+protocol = "tcp"
+name = "Android Debug Bridge (network)"
+risk = "critical"
+summary = "Wireless debugging on an Android device or TV box."
+explain = "Anyone who can connect has full control of the device, without a password."
+advice = "Turn off wireless/ADB debugging in the device's developer options."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 5800
+protocol = "tcp"
+name = "VNC (web)"
+risk = "high"
+summary = "Web access to VNC screen sharing."
+explain = "Others can try to view and control this screen."
+advice = "Use a strong VNC password, or only allow it via a VPN."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 5900
+protocol = "tcp"
+name = "VNC"
+risk = "high"
+summary = "VNC screen sharing and remote control."
+explain = "Others can try to view and control this screen. Many VNC setups have weak or no passwords."
+advice = "Use a strong VNC password, or only allow it via a VPN."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 5985
+protocol = "tcp"
+name = "WinRM (PowerShell remoting)"
+risk = "high"
+summary = "Windows Remote Management: remote PowerShell control of this PC."
+explain = "Anyone with a password for this PC can run commands on it remotely."
+advice = "Turn WinRM off unless you manage this PC remotely."
+topic = "winrm"
+kernel = true
+service = "WinRM"
+lan_probe = true
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 5986
+protocol = "tcp"
+name = "WinRM over HTTPS"
+risk = "medium"
+summary = "Encrypted Windows Remote Management."
+explain = "Remote PowerShell control, protected by a certificate."
+advice = "Turn WinRM off unless you manage this PC remotely."
+topic = "winrm"
+kernel = true
+service = "WinRM"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 6379
+protocol = "tcp"
+name = "Redis"
+risk = "critical"
+summary = "A Redis in-memory database, which has no password by default."
+explain = "Anyone who can connect can read and change all its data, and often take over the computer."
+advice = "Limit it to this PC and set a password."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 6881
+protocol = "tcp"
+name = "BitTorrent"
+risk = "low"
+summary = "A BitTorrent client accepting peer connections."
+explain = "Normal while a torrent app runs; peers see your IP address."
+advice = "Fine if you use a torrent app."
+fixes = ["exposure.block_program"]
+
+[[port]]
+port = 7680
+protocol = "tcp"
+name = "Delivery Optimization"
+risk = "low"
+summary = "Windows Update sharing downloads with other PCs on your network."
+explain = "Other PCs can download Windows updates from this one."
+advice = "Fine on a home network. You can limit it in Settings > Windows Update > Delivery Optimization."
+service = "DoSvc"
+fixes = ["exposure.block_port"]
+
+[[port]]
+port = 8000
+protocol = "tcp"
+name = "Development web server"
+risk = "medium"
+summary = "Typical port for test web servers (Python, Django…)."
+explain = "Development servers rarely have a login and may show your files."
+advice = "Limit it to this PC when other devices don't need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 8080
+protocol = "tcp"
+name = "Web server (alternative)"
+risk = "medium"
+summary = "Alternative web server port, often admin panels, proxies or test servers."
+explain = "Other devices can open whatever this server shows, often without a login."
+advice = "Check which program runs it. Keep it only if other devices need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 8443
+protocol = "tcp"
+name = "Web admin (HTTPS)"
+risk = "medium"
+summary = "Alternative encrypted web port, typical for admin panels."
+explain = "Admin panels are attractive targets for password guessing."
+advice = "Check which program runs it. Keep it only if other devices need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 8765
+protocol = "tcp"
+name = "Test web server"
+risk = "medium"
+summary = "A test port (used by SimplySec's own end-to-end test)."
+explain = "Whatever web server runs here can be opened by other devices."
+advice = "Limit it to this PC when you are done testing."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 8888
+protocol = "tcp"
+name = "Jupyter / dev server"
+risk = "high"
+summary = "Typical port for Jupyter notebooks."
+explain = "A notebook server lets anyone with access run code on this PC."
+advice = "Keep notebooks limited to this PC and protected with a token."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 9000
+protocol = "tcp"
+name = "Admin / dev server"
+risk = "medium"
+summary = "Common for container dashboards (Portainer) and development tools."
+explain = "Often an admin panel with powerful controls."
+advice = "Check which program runs it. Keep it only if other devices need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 9090
+protocol = "tcp"
+name = "Admin web panel"
+risk = "medium"
+summary = "Common for monitoring dashboards (Prometheus, Cockpit) and chat servers (Openfire)."
+explain = "Dashboards can reveal a lot about this PC and often have no login."
+advice = "Check which program runs it. Keep it only if other devices need it."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 9100
+protocol = "tcp"
+name = "Raw printing (JetDirect)"
+risk = "low"
+summary = "Direct printing to a network printer."
+explain = "Anyone on the network can print. Normal for printers, unusual for a PC."
+advice = "Nothing to do for printers."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 9200
+protocol = "tcp"
+name = "Elasticsearch"
+risk = "critical"
+summary = "An Elasticsearch search database, often without a login."
+explain = "Anyone who can connect can read and delete all indexed data."
+advice = "Limit it to this PC and turn on security."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 10000
+protocol = "tcp"
+name = "Webmin"
+risk = "high"
+summary = "Webmin, a web panel that controls a whole server."
+explain = "Full remote control of the system through a web page; a prime target for password guessing."
+advice = "Limit it to your home network or VPN, with a strong password."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 11211
+protocol = "tcp"
+name = "Memcached"
+risk = "high"
+summary = "A Memcached cache server, which has no password."
+explain = "Anyone can read the cache, and open Memcached servers are abused for huge traffic floods."
+advice = "Limit it to this PC."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 11434
+protocol = "tcp"
+name = "Ollama API"
+risk = "medium"
+summary = "Ollama's local AI model API."
+explain = "The Ollama API has no password: anyone who can reach it can use your models and see which ones you have."
+advice = "Fine if you share models on purpose. Otherwise limit it to this PC or your home network/VPN."
+lan_probe = true
+fixes = ["exposure.block_program", "exposure.block_program_public"]
+
+[[port]]
+port = 12345
+protocol = "tcp"
+name = "Port 12345 (old NetBus trojan)"
+risk = "high"
+summary = "Historically used by the NetBus remote-control trojan."
+explain = "Legitimate programs rarely use it. Check which program is listening."
+advice = "If you don't recognise the program, block it and scan with Windows Security."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 25565
+protocol = "tcp"
+name = "Minecraft server"
+risk = "low"
+summary = "A Minecraft multiplayer server."
+explain = "Players who can reach it can join; game servers occasionally have security holes."
+advice = "Fine if you host games. Keep the server updated."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 27017
+protocol = "tcp"
+name = "MongoDB"
+risk = "high"
+summary = "A MongoDB database."
+explain = "Older or default MongoDB setups have no password; exposed databases get wiped and ransomed."
+advice = "Limit it to this PC and require authentication."
+lan_probe = true
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+[[port]]
+port = 32400
+protocol = "tcp"
+name = "Plex Media Server"
+risk = "low"
+summary = "Plex media streaming."
+explain = "Other devices can stream your media library; Plex requires a sign-in."
+advice = "Fine if you use Plex."
+fixes = ["exposure.block_program"]
+
+[[port]]
+port = 41641
+protocol = "udp"
+name = "Tailscale"
+risk = "info"
+summary = "Tailscale's encrypted VPN tunnel."
+explain = "Only carries encrypted traffic for devices in your Tailscale network."
+advice = "Nothing to do."
+fixes = []
+
+[[port]]
+port = 47808
+protocol = "udp"
+name = "BACnet"
+risk = "medium"
+summary = "Building automation (heating, lighting) control."
+explain = "BACnet has no real security; anyone who can reach it can control devices."
+advice = "Keep building-control devices on a separate network."
+fixes = ["exposure.block_port", "exposure.block_program"]
+
+# Port ranges: used only when no exact entry matches.
+[[range]]
+start = 49152
+end = 65535
+protocol = "tcp"
+name = "Dynamic port"
+risk = "low"
+summary = "A temporary port Windows hands out to programs (often Windows' own RPC services)."
+explain = "What it means depends on the program behind it; see the Program column."
+advice = "Judge by the program, not the port number."
+
+[[range]]
+start = 49152
+end = 65535
+protocol = "udp"
+name = "Dynamic port"
+risk = "info"
+summary = "A temporary port a program uses, usually for its own outgoing traffic."
+explain = "What it means depends on the program behind it."
+advice = "Judge by the program, not the port number."
