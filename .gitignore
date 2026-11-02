@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime output
+logs/
+*.log
+*.wfw
+*.db
+
+# Build output
+build/
+dist/
+
+# v1 runtime leftovers (kept locally, never committed)
+legacy/v1-artifacts/

@@ -1,0 +1,6 @@
+
+Downloading Nmap installer...
+$client.DownloadFile("https://nmap.org/dist/nmap-7.97-setup.exe", "nmap-7.97-setup.exe"
+
+Downloading Nmap installer...
+$client.DownloadFile("https://nmap.org/dist/nmap-7.97-setup.exe", "nmap-7.97-setup.exe"
