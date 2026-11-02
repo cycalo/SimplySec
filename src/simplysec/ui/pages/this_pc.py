@@ -82,17 +82,3 @@ class ThisPcPage(Page):
                 c.unkeep_requested.connect(lambda fi: self.ctl.unkeep(fi.keep_key))
                 self.cards[f.id] = c
                 self.body.addWidget(c)
-
-    def show_finding(self, finding_id: str) -> None:
-        """Scroll to a finding's card and highlight it briefly."""
-        from PySide6.QtCore import QTimer
-
-        if finding_id not in getattr(self, "cards", {}):
-            self.show_info.setChecked(True)
-            self.refresh()
-        card = getattr(self, "cards", {}).get(finding_id)
-        if card is None:
-            return
-        QTimer.singleShot(50, lambda: self.ensureWidgetVisible(card, 0, 40))
-        card.setStyleSheet("#Card { border: 2px solid palette(highlight); }")
-        QTimer.singleShot(2500, lambda: card.setStyleSheet(""))

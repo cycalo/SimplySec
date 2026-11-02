@@ -22,12 +22,11 @@ STATUS_TEXT = {
 
 
 class FindingCard(QFrame):
-    """``compact`` (Overview): title, what it means, Fix, Keep and a link to the full card."""
+    """``compact`` (Overview): title, what it means, Fix, Keep, and "Show more" for the rest."""
 
     fix_requested = Signal(object, object)  # Finding, FixOption
     keep_requested = Signal(object)  # Finding
     unkeep_requested = Signal(object)  # Finding
-    details_requested = Signal(object)  # Finding: open the full card on This PC
 
     def __init__(
         self,
@@ -68,29 +67,25 @@ class FindingCard(QFrame):
 
         what = label(f"<b>What this means:</b> {html.escape(finding.what_it_means)}", rich=True)
         outer.addWidget(what)
-        if not compact:
-            self.details = label(self._details_html(), rich=True)
-            self.details.setObjectName("Dim")
-            self.details.setVisible(False)
-            self.details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            self.learn = label(html.escape(finding.learn_more), object_name="Dim")
-            self.learn.setVisible(False)
-            outer.addWidget(self.details)
-            outer.addWidget(self.learn)
 
-        primary = next((o for o in finding.fixes if o.impact), None)
-        if primary is not None and finding.status == FindingStatus.OPEN:
-            imp = Impact.from_dict(primary.impact)
-            color = IMPACT_COLORS[imp.level.value]
-            text = (
-                f"<b>What uses this:</b> <span style='color:{color}'>{html.escape(imp.level.label)}</span>"
-                f" – {html.escape(imp.headline)}"
-            )
-            if imp.evidence:
-                text += "<br>" + "<br>".join(f"• {html.escape(e)}" for e in imp.evidence[:3])
-                if len(imp.evidence) > 3:
-                    text += f"<br>• …and {len(imp.evidence) - 3} more (shown before you apply)"
-            outer.addWidget(label(text, rich=True))
+        # Extra sections. On the full card the impact line is always shown and the rest is
+        # behind its own link; on a compact card everything extra sits behind "Show more".
+        self.impact = self._impact_label()
+        self.details = label(self._details_html(), rich=True) if finding.details else None
+        if self.details is not None:
+            self.details.setObjectName("Dim")
+            self.details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.learn = (
+            label(html.escape(finding.learn_more), object_name="Dim")
+            if finding.learn_more
+            else None
+        )
+        for w in (self.impact, self.learn, self.details):
+            if w is not None:
+                outer.addWidget(w)
+                w.setVisible(False)
+        if self.impact is not None and not compact:
+            self.impact.setVisible(True)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
@@ -110,30 +105,55 @@ class FindingCard(QFrame):
             unkeep.setText("Score again")
             unkeep.clicked.connect(lambda: self.unkeep_requested.emit(self.finding))
             buttons.addWidget(unkeep)
-        if compact:
-            more_btn = QToolButton()
-            more_btn.setObjectName("Link")
-            more_btn.setText("More details")
-            more_btn.setToolTip("Open this finding on the This PC page, with technical details")
-            more_btn.clicked.connect(lambda: self.details_requested.emit(self.finding))
-            buttons.addWidget(more_btn)
-        else:
-            if finding.details:
+        extras = [w for w in (self.impact, self.learn, self.details) if w is not None]
+        if compact and extras:
+            more = QToolButton()
+            more.setObjectName("Link")
+            more.setText("Show more")
+            more.setCheckable(True)
+            more.setToolTip("What uses this, advice and technical details")
+
+            def toggle(on: bool) -> None:
+                for w in extras:
+                    w.setVisible(on)
+                more.setText("Show less" if on else "Show more")
+
+            more.toggled.connect(toggle)
+            buttons.addWidget(more)
+        elif not compact:
+            if self.details is not None:
                 tech = QToolButton()
                 tech.setObjectName("Link")
                 tech.setText("Technical details")
                 tech.setCheckable(True)
                 tech.toggled.connect(self.details.setVisible)
                 buttons.addWidget(tech)
-            if finding.learn_more:
-                more = QToolButton()
-                more.setObjectName("Link")
-                more.setText("Learn more")
-                more.setCheckable(True)
-                more.toggled.connect(self.learn.setVisible)
-                buttons.addWidget(more)
+            if self.learn is not None:
+                learn_btn = QToolButton()
+                learn_btn.setObjectName("Link")
+                learn_btn.setText("Learn more")
+                learn_btn.setCheckable(True)
+                learn_btn.toggled.connect(self.learn.setVisible)
+                buttons.addWidget(learn_btn)
         buttons.addStretch(1)
         outer.addLayout(buttons)
+
+    def _impact_label(self) -> QLabel | None:
+        f = self.finding
+        primary = next((o for o in f.fixes if o.impact), None)
+        if primary is None or f.status != FindingStatus.OPEN:
+            return None
+        imp = Impact.from_dict(primary.impact)
+        color = IMPACT_COLORS[imp.level.value]
+        text = (
+            f"<b>What uses this:</b> <span style='color:{color}'>{html.escape(imp.level.label)}</span>"
+            f" – {html.escape(imp.headline)}"
+        )
+        if imp.evidence:
+            text += "<br>" + "<br>".join(f"• {html.escape(e)}" for e in imp.evidence[:3])
+            if len(imp.evidence) > 3:
+                text += f"<br>• …and {len(imp.evidence) - 3} more (shown before you apply)"
+        return label(text, rich=True)
 
     def _fix_button(self, fixes: list[FixOption]) -> QToolButton:
         btn = QToolButton()

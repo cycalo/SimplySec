@@ -33,7 +33,6 @@ class Controller(QObject):
     scan_finished = Signal(object)  # ScanResult
     changes_updated = Signal()
     error = Signal(str)
-    show_finding = Signal(object)  # Finding: navigate to its full card
 
     def __init__(self, parent_widget: QWidget) -> None:
         super().__init__(parent_widget)
