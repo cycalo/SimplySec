@@ -50,7 +50,8 @@ simplysec fix --finding ID --fix FIX_ID     one fix; add --mark-private, --resto
 simplysec keep --finding ID [--undo]        accept a risk ("Keep: I need this")
 simplysec changes                           everything SimplySec changed
 simplysec undo --change N | --batch N | --all | --rules
-simplysec history
+simplysec history                           saved scans with score changes
+simplysec report --html [PATH]              printable HTML report
 ```
 
 `fix` and `undo` need an elevated prompt (or `--elevate` for a UAC prompt).

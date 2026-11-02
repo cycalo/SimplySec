@@ -167,6 +167,8 @@ class NetworkPage(Page):
             name = d.get("name") or ""
             if not name and d.get("randomized"):
                 name = "Private address (likely a phone)"
+            elif not name:
+                name = f"{d['vendor']} device" if d.get("vendor") else "Unknown device"
             if d.get("is_gateway"):
                 name = f"{name or 'Router'} (router)"
             if d.get("new"):

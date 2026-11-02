@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimplySec report – {{ result.computer }}</title>
+<style>
+  :root { --text:#1b1b1b; --dim:#5d5d5d; --line:#e5e5e5; --card:#fff; --bg:#f6f6f6; --accent:#0067c0;
+          --critical:#c42b1c; --high:#d83b01; --medium:#b76e00; --low:#0f6cbd; --info:#6b6b6b; --good:#0f7b0f; }
+  * { box-sizing: border-box; }
+  body { font: 14px/1.5 "Segoe UI", system-ui, sans-serif; color: var(--text); background: var(--bg); margin: 0; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 19px; margin: 28px 0 8px; } h3 { font-size: 15px; margin: 0; }
+  .dim { color: var(--dim); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 10px 0; }
+  .summary { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .grade { font-size: 44px; font-weight: 700; width: 92px; height: 92px; border-radius: 50%; display: flex;
+           align-items: center; justify-content: center; border: 8px solid var(--accent); }
+  .counts span { display: inline-block; margin-right: 14px; font-weight: 600; }
+  .chip { display: inline-block; border-radius: 4px; padding: 0 6px; color: #fff; font-size: 12px; font-weight: 600; }
+  .critical { background: var(--critical); } .high { background: var(--high); } .medium { background: var(--medium); }
+  .low { background: var(--low); } .info { background: var(--info); }
+  .status { font-weight: 600; } .status.Good { color: var(--good); } .status.Could { color: var(--medium); } .status.Needs { color: var(--critical); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #fafafa; }
+  details summary { cursor: pointer; color: var(--accent); }
+  .finding { border-top: 1px solid var(--line); padding: 10px 0; } .finding:first-of-type { border-top: none; }
+  .tag { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+  svg { max-width: 100%; }
+  @media print { body { background: #fff; } .card { break-inside: avoid; } details { display: block; } details summary { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Security report for {{ result.computer }}</h1>
+  <div class="dim">SimplySec {{ version }} · scan {{ result.started[:16] | replace("T", " ") }} · generated {{ generated }}{% if not result.is_admin %} · read-only scan{% endif %}</div>
+
+  <div class="card summary">
+    <div class="grade">{{ result.grade }}</div>
+    <div>
+      <div style="font-size:20px; font-weight:600">Score {{ result.score }}/100</div>
+      <div class="counts">
+        <span style="color:var(--critical)">{{ counts.critical }} critical</span>
+        <span style="color:var(--high)">{{ counts.high }} high</span>
+        <span style="color:var(--medium)">{{ counts.medium }} medium</span>
+        <span style="color:var(--low)">{{ counts.low }} low</span>
+      </div>
+      {% for line in result.network_status() %}<div class="dim">{{ line }}</div>{% endfor %}
+    </div>
+    {% if trend|length > 1 %}
+    <div>
+      <div class="dim">Score over time</div>
+      {% set w = 260 %}{% set h = 70 %}{% set n = trend|length %}
+      <svg width="{{ w }}" height="{{ h }}" viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Score trend">
+        <polyline fill="none" stroke="#0067c0" stroke-width="2"
+          points="{% for d, s in trend %}{{ (loop.index0 * (w - 10) / (n - 1) + 5)|round(1) }},{{ (h - 5 - s * (h - 10) / 100)|round(1) }} {% endfor %}"/>
+      </svg>
+    </div>
+    {% endif %}
+  </div>
+
+  <h2>Findings by control area</h2>
+  {% for g in groups %}
+  <div class="card">
+    <h3>{{ g.name }} <span class="status {{ g.status.split()[0] }}">– {{ g.status }}</span></h3>
+    <div class="dim">{{ g.blurb }}</div>
+    {% if not g.findings %}<p class="dim">No findings.</p>{% endif %}
+    {% for f in g.findings %}
+    <div class="finding">
+      <span class="chip {{ severity_class(f.severity) }}">{{ f.severity.label }}</span>
+      <strong>{{ f.title }}</strong>
+      {% if f.status.value != "open" %}<span class="tag">{{ {"accepted": "Kept", "managed": "Managed by organisation", "info": "For information"}[f.status.value] }}</span>{% endif %}
+      <div>{{ f.what_it_means }}</div>
+      {% if f.fixes %}<div class="dim">Suggested: {{ f.fixes | map(attribute="label") | join("; ") }}</div>{% endif %}
+      {% if f.details %}
+      <details><summary>Technical details</summary>
+        <table>{% for k, v in f.details %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
+      </details>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <h2>Ports other devices can reach</h2>
+  <div class="card">
+    {% if ports %}
+    <table>
+      <tr><th>Port</th><th>Program</th><th>Listening on</th><th>Reachable from</th><th>Risk</th></tr>
+      {% for p in ports %}
+      <tr><td>{{ p.protocol|upper }} {{ p.port }}</td><td>{{ p.process }}{% if p.publisher %} <span class="dim">({{ p.publisher }})</span>{% endif %}</td>
+          <td>{{ p.listening_on }}</td><td>{{ p.reachable_from }}</td><td>{{ p.risk.label if p.verdict.value == "reachable" else "Uncertain" }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="dim">No listening program can be reached from other devices.</p>{% endif %}
+  </div>
+
+  {% if devices %}
+  <h2>Devices on your network</h2>
+  <div class="card">
+    <table>
+      <tr><th>Name</th><th>Vendor</th><th>IP</th><th>MAC</th><th>Open services</th><th>Trusted</th></tr>
+      {% for d in devices %}
+      <tr><td>{{ d.name or ("Private address (likely a phone)" if d.randomized else "Unknown") }}{% if d.is_gateway %} (router){% endif %}</td>
+          <td>{{ d.vendor }}</td><td>{{ d.ip }}</td><td>{{ d.mac }}</td><td>{{ d.open_ports | join(", ") }}</td><td>{{ "yes" if d.trusted else "" }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if router %}
+  <h2>Router</h2>
+  <div class="card">
+    {% if router.found %}
+      <p><strong>{{ router.friendly_name or router.model or "Your router" }}</strong> has UPnP on. Internet address: {{ router.external_ip or "unknown" }}.</p>
+      {% if router.mappings %}
+      <table><tr><th>Internet port</th><th>Forwarded to</th><th>Description</th></tr>
+      {% for m in router.mappings %}<tr><td>{{ m.protocol }} {{ m.external_port }}</td><td>{{ m.internal_client }}:{{ m.internal_port }}</td><td>{{ m.description }}</td></tr>{% endfor %}
+      </table>
+      {% else %}<p class="dim">No port forwards.</p>{% endif %}
+    {% else %}<p>UPnP port forwarding is not offered by the router.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Changes made by SimplySec</h2>
+  <div class="card">
+    {% if changes %}
+    <table><tr><th>#</th><th>Change</th><th>Status</th><th>Verified</th><th>When</th></tr>
+      {% for c in changes %}
+      <tr><td>{{ c.id }}</td><td>{{ c.summary }}</td><td>{{ c.status }}</td>
+          <td>{{ {True: "yes", False: "NO", None: ""}[c.verified] }}</td><td>{{ (c.reverted_at or c.applied_at or "")[:16] | replace("T", " ") }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="dim">SimplySec has not changed anything on this PC.</p>{% endif %}
+  </div>
+
+  <h2>Accepted risks</h2>
+  <div class="card">
+    {% if accepted %}
+    <ul>{% for a in accepted %}<li>{{ a.title or a.keep_key }} <span class="dim">(since {{ a.created[:10] }})</span></li>{% endfor %}</ul>
+    {% else %}<p class="dim">None.</p>{% endif %}
+  </div>
+  <p class="dim">This report describes the PC at the time of the scan. Findings marked "Kept" were accepted by the user and are not scored.</p>
+</main>
+</body>
+</html>

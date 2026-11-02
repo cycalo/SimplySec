@@ -106,6 +106,9 @@ class MainWindow(QMainWindow):
         from .pages.network import NetworkPage
 
         self.add_page("My network", NetworkPage(self.ctl))
+        from .pages.history import HistoryPage
+
+        self.add_page("History", HistoryPage(self.ctl))
 
     def add_page(self, name: str, page: QWidget) -> None:
         self.pages[name] = page

@@ -7,6 +7,7 @@ simplysec keep --finding ID
 simplysec undo --change N | --batch N | --all | --rules  [--yes]
 simplysec changes
 simplysec history [--limit N]
+simplysec report --html [PATH]
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import argparse
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any
 
 from . import __version__
@@ -377,6 +379,21 @@ def cmd_history(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    from .core.report.html import write_report
+
+    engine = _engine()
+    result = engine.scan(progress=_progress, save=True)
+    path = (
+        Path(args.path)
+        if args.path
+        else Path.cwd() / f"SimplySec-report-{result.started[:10]}.html"
+    )
+    write_report(path, result, engine)
+    _out(f"Report written to {path}")
+    return EXIT_OK
+
+
 # --------------------------------------------------------------------------- entry
 
 
@@ -439,6 +456,10 @@ def build_parser() -> argparse.ArgumentParser:
     h.add_argument("--limit", type=int, default=30)
     h.set_defaults(func=cmd_history)
 
+    r = sub.add_parser("report", help="scan and write a printable HTML report")
+    r.add_argument("--html", action="store_true", default=True, help="HTML (the only format)")
+    r.add_argument("path", nargs="?", help="output file (default: ./SimplySec-report-DATE.html)")
+    r.set_defaults(func=cmd_report)
     return p
 
 

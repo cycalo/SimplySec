@@ -183,6 +183,20 @@ reported as *Managed* and never changed.
   TKIP or WPA networks that auto-connect are Medium (fix: `wifi.connection_mode` = manual, undoable);
   being connected to one right now is High.
 
+## History and reports (`core/history.py`, `core/report/`)
+
+* Every scan is stored (newest 365) in the per-user history DB with its findings and port table
+  (raw facts are not stored). `compare()` reports new and resolved findings, newly reachable or
+  no-longer-reachable ports, new devices and the score change; the Overview and History pages
+  use it.
+* The History page draws the score trend with QPainter (no QtCharts).
+* `simplysec report --html` and the History page's *Export HTML report* write one
+  self-contained, printable file (inline CSS and an inline SVG trend). Jinja2 runs with
+  autoescape on because device names, router names and port-forward descriptions come from the
+  network and are untrusted. Findings are grouped into five small-business control areas
+  (firewalls, secure configuration, user access control, malware protection, security update
+  management), followed by reachable ports, devices, router, changes made and accepted risks.
+
 ## Knowledge base
 
 `core/knowledge/ports.toml`, `programs.toml` and `services.toml` are the single source of truth
