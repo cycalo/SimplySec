@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import urllib.parse
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -134,6 +135,12 @@ def router_findings(
         f.status = FindingStatus.INFO
         return [f]
     name = router.get("friendly_name") or router.get("model") or "Your router"
+    host = urllib.parse.urlsplit(router.get("location", "")).hostname or ""
+    admin = f"http://{host}" if host else "the address printed on your router's sticker"
+    steps = (
+        f"Open your router's admin page ({admin}) in a browser and sign in with the admin password "
+        "from the sticker. Look under Advanced, NAT, Port forwarding or UPnP. "
+    )
     for m in router.get("mappings", []):
         if not m.get("enabled", True):
             continue
@@ -155,6 +162,13 @@ def router_findings(
                 + ("this PC" if to_me else "that device")
                 + f" on port {m.get('internal_port')} ('{desc}'). Programs (often games or remote-access tools) "
                 "open these with UPnP. If you don't need it, close the program or turn UPnP off in your router."
+            ),
+            learn_more=(
+                f"First check which program opened it: '{desc}'. If you don't need it, close that "
+                "program or turn off its 'open port'/UPnP option; UPnP forwards usually disappear when "
+                "the program stops. "
+                + steps
+                + "Delete the forward there, or turn UPnP off. Choose Keep if you need it (for example a game server)."
             ),
             details=[
                 ("Internal", f"{m.get('internal_client')}:{m.get('internal_port')}"),
@@ -180,6 +194,8 @@ def router_findings(
                 "asking. Games and video calls sometimes use it. If nothing needs it, turn UPnP off in your "
                 "router's admin page (usually under Advanced or NAT)."
             ),
+            learn_more=steps
+            + "Turn UPnP off. If a game or video-call app then has connection problems, turn it back on.",
             details=[
                 ("Router", f"{name} {router.get('model', '')}".strip()),
                 ("Description", router.get("location", "")),

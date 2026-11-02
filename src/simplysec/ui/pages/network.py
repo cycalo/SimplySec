@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -15,13 +15,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from ...core import knowledge, lan
 from ...core.lan.inventory import Device, risky_services
+from ...core.models import Finding, FindingStatus, Severity
 from ...core.util import as_list
 from ..controller import Controller
 from ..widgets import card, label
+from ..widgets.finding_card import FindingCard
 from . import Page
 
 COLUMNS = ["Trusted", "Name", "Vendor", "IP", "First seen", "Last seen", "Services"]
@@ -58,7 +61,21 @@ class NetworkPage(Page):
         for col, w in enumerate([70, 220, 180, 110, 110, 110]):
             self.table.setColumnWidth(col, w)
         self.table.itemChanged.connect(self._trusted_changed)
+        self.table.cellClicked.connect(self._row_clicked)
         self.body.addWidget(self.table)
+
+        self.advice_title = label("What to do about your devices", object_name="SectionTitle")
+        self.body.addWidget(self.advice_title)
+        self.advice_note = label(
+            "SimplySec never changes other devices. Each card says what the risk is and what to "
+            "change in that device's settings or app. Click a device in the table to jump to it.",
+            object_name="Dim",
+        )
+        self.body.addWidget(self.advice_note)
+        self.advice = QVBoxLayout()
+        self.advice.setSpacing(10)
+        self.body.addLayout(self.advice)
+        self.device_cards: dict[str, FindingCard] = {}
 
         self.router_card, self.router_layout = card()
         self.body.addWidget(self.router_card)
@@ -131,8 +148,49 @@ class NetworkPage(Page):
         extras = result.extras if result else {}
         devices = extras.get("devices")
         self._fill_devices(devices if devices is not None else self._stored_devices())
+        findings = [
+            f for f in (result.findings if result else []) if f.status == FindingStatus.OPEN
+        ]
+        self._fill_advice([f for f in findings if f.check == "lan"])
         self._fill_router(extras.get("router") or {})
+        for f in findings:
+            if f.check == "router" and f.severity > Severity.INFO:
+                self.router_layout.addWidget(self._card(f))
         self._fill_wifi(result.facts.get("wifi", {}).get("value") if result else None)
+
+    def _card(self, f: Finding) -> FindingCard:
+        c = FindingCard(f, show_advice=True)
+        c.fix_requested.connect(self.ctl.request_fix)
+        c.keep_requested.connect(self.ctl.keep)
+        c.unkeep_requested.connect(lambda fi: self.ctl.unkeep(fi.keep_key))
+        return c
+
+    def _fill_advice(self, findings: list[Finding]) -> None:
+        self.clear(self.advice)
+        self.device_cards = {}
+        if not findings:
+            text = (
+                "No risky services or unknown new devices found."
+                if self.ctl.result and self.ctl.result.extras.get("devices")
+                else "Scan your network to get advice about its devices."
+            )
+            self.advice.addWidget(label(text, object_name="Dim"))
+            return
+        for f in findings:
+            c = self._card(f)
+            mac = f.id.rsplit(".", 1)[-1]
+            self.device_cards.setdefault(mac, c)
+            self.advice.addWidget(c)
+
+    def _row_clicked(self, row: int, _col: int) -> None:
+        item = self.table.item(row, 0)
+        mac = item.data(Qt.ItemDataRole.UserRole) if item else None
+        card = self.device_cards.get(mac or "")
+        if card is None:
+            return
+        self.ensureWidgetVisible(card, 0, 40)
+        card.setStyleSheet("#Card { border: 2px solid palette(highlight); }")
+        QTimer.singleShot(2000, lambda: card.setStyleSheet(""))
 
     def _stored_devices(self) -> list[dict[str, Any]]:
         out = []

@@ -57,10 +57,21 @@ class ThisPcPage(Page):
                 label("No findings. Nothing needs your attention.", object_name="Dim")
             )
             return
+        other = ("lan", "router")  # advice about other devices, not this PC's settings
         groups = [
-            ("Needs attention", lambda f: f.scored and f.severity >= Severity.HIGH),
-            ("Worth fixing", lambda f: f.scored and f.severity == Severity.MEDIUM),
-            ("Minor", lambda f: f.scored and f.severity == Severity.LOW),
+            (
+                "Needs attention",
+                lambda f: f.scored and f.severity >= Severity.HIGH and f.check not in other,
+            ),
+            (
+                "Worth fixing",
+                lambda f: f.scored and f.severity == Severity.MEDIUM and f.check not in other,
+            ),
+            ("Minor", lambda f: f.scored and f.severity == Severity.LOW and f.check not in other),
+            (
+                "Other devices on your network and your router",
+                lambda f: f.scored and f.check in other,
+            ),
             ("For information and kept risks", lambda f: not f.scored),
         ]
         for title, test in groups:

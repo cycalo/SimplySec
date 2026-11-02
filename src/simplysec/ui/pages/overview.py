@@ -61,7 +61,7 @@ class OverviewPage(Page):
         self.body.addWidget(self.network_card)
         self.network_card.hide()
 
-        self.body.addWidget(label("Top recommended fixes", object_name="SectionTitle"))
+        self.body.addWidget(label("Top things to look at", object_name="SectionTitle"))
         self.top_box = QVBoxLayout()
         self.body.addLayout(self.top_box)
         self.top_box.addWidget(label("No scan yet.", object_name="Dim"))
@@ -125,9 +125,11 @@ class OverviewPage(Page):
             self.network_card.show()
 
         self.clear(self.top_box)
-        top = [f for f in opened if f.fixes][:5]
+        top = opened[:5]
         if not top:
-            self.top_box.addWidget(label("Nothing to fix. Well done.", object_name="Dim"))
+            self.top_box.addWidget(
+                label("Nothing needs your attention. Well done.", object_name="Dim")
+            )
         for f in top:
             c = FindingCard(f, compact=True)
             c.fix_requested.connect(self.ctl.request_fix)

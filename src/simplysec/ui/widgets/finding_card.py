@@ -34,6 +34,7 @@ class FindingCard(QFrame):
         parent: QWidget | None = None,
         compact: bool = False,
         show_area: bool = False,
+        show_advice: bool = False,
     ) -> None:
         super().__init__(parent)
         self.finding = finding
@@ -76,7 +77,7 @@ class FindingCard(QFrame):
             self.details.setObjectName("Dim")
             self.details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.learn = (
-            label(html.escape(finding.learn_more), object_name="Dim")
+            label(f"<b>What to do:</b> {html.escape(finding.learn_more)}", rich=True)
             if finding.learn_more
             else None
         )
@@ -86,6 +87,8 @@ class FindingCard(QFrame):
                 w.setVisible(False)
         if self.impact is not None and not compact:
             self.impact.setVisible(True)
+        if self.learn is not None and show_advice:
+            self.learn.setVisible(True)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
@@ -109,14 +112,16 @@ class FindingCard(QFrame):
         if compact and extras:
             more = QToolButton()
             more.setObjectName("Link")
-            more.setText("Show more")
+            closed = "Show more" if actionable else "How to fix"
+            opened = "Show less" if actionable else "Hide advice"
+            more.setText(closed)
             more.setCheckable(True)
             more.setToolTip("What uses this, advice and technical details")
 
             def toggle(on: bool) -> None:
                 for w in extras:
                     w.setVisible(on)
-                more.setText("Show less" if on else "Show more")
+                more.setText(opened if on else closed)
 
             more.toggled.connect(toggle)
             buttons.addWidget(more)
@@ -128,7 +133,7 @@ class FindingCard(QFrame):
                 tech.setCheckable(True)
                 tech.toggled.connect(self.details.setVisible)
                 buttons.addWidget(tech)
-            if self.learn is not None:
+            if self.learn is not None and not show_advice:
                 learn_btn = QToolButton()
                 learn_btn.setObjectName("Link")
                 learn_btn.setText("Learn more")
