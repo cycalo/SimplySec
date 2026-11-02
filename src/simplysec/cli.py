@@ -8,6 +8,7 @@ simplysec undo --change N | --batch N | --all | --rules  [--yes]
 simplysec changes
 simplysec history [--limit N]
 simplysec report --html [PATH]
+simplysec monitor --run | --enable [HH:MM] | --disable
 """
 
 from __future__ import annotations
@@ -379,6 +380,24 @@ def cmd_history(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_monitor(args: argparse.Namespace) -> int:
+    from .core import monitor
+
+    if args.run:
+        return monitor.run_once(_engine())
+    if args.enable or args.disable:
+        if not elevation.is_admin():
+            if args.elevate:
+                return _relaunch_elevated()
+            _out("Turning the daily check on or off needs administrator rights (add --elevate).")
+            return EXIT_NEEDS_ADMIN
+        return monitor.cli_toggle(
+            _engine(), enable_it=bool(args.enable), time=args.enable or "12:00"
+        )
+    _out("Use --run, --enable [HH:MM] or --disable.")
+    return EXIT_USAGE
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     from .core.report.html import write_report
 
@@ -455,6 +474,19 @@ def build_parser() -> argparse.ArgumentParser:
     h = sub.add_parser("history", help="list saved scans")
     h.add_argument("--limit", type=int, default=30)
     h.set_defaults(func=cmd_history)
+
+    m = sub.add_parser("monitor", help="the background daily check")
+    m.add_argument(
+        "--run", action="store_true", help="read-only scan, save it, notify if something got worse"
+    )
+    m.add_argument(
+        "--enable", nargs="?", const="12:00", metavar="HH:MM", help="schedule it (administrator)"
+    )
+    m.add_argument(
+        "--disable", action="store_true", help="remove the scheduled task (administrator)"
+    )
+    m.add_argument("--elevate", action="store_true")
+    m.set_defaults(func=cmd_monitor)
 
     r = sub.add_parser("report", help="scan and write a printable HTML report")
     r.add_argument("--html", action="store_true", default=True, help="HTML (the only format)")

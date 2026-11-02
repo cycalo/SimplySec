@@ -33,6 +33,7 @@ class SettingsPage(Page):
 
         self.extra = QVBoxLayout()
         self.body.addLayout(self.extra)
+        self._build_daily_check()
 
         nets_card, self.nets_layout = card()
         self.body.addWidget(nets_card)
@@ -71,6 +72,10 @@ class SettingsPage(Page):
         self.restart.setVisible(not admin)
 
         self._fill_networks()
+        settings = self.ctl.engine.history.get_setting("daily_check", {}) or {}
+        self.daily_status.setText(
+            f"On, daily at {settings.get('time')}." if settings.get("enabled") else "Off."
+        )
         self.clear(self.acc_layout)
         self.acc_layout.addWidget(label("Accepted risks (Keep)", object_name="SectionTitle"))
         try:
@@ -98,6 +103,45 @@ class SettingsPage(Page):
             b.clicked.connect(lambda _=False, k=a["keep_key"]: self.ctl.unkeep(k))
             r.addWidget(b)
             self.acc_layout.addLayout(r)
+
+    def _build_daily_check(self) -> None:
+        from PySide6.QtCore import QTime
+        from PySide6.QtWidgets import QCheckBox, QTimeEdit
+
+        dc, dl = card()
+        dl.addWidget(label("Daily check", object_name="SectionTitle"))
+        dl.addWidget(
+            label(
+                "Once a day SimplySec runs a read-only scan in the background and shows a notification "
+                "only if something got worse: the score drops by 5 or more, a new high-risk finding, "
+                "a new device on your network, or antivirus or the firewall turned off. It never "
+                "changes anything. The scheduled task is recorded on the Changes page.",
+                object_name="Dim",
+            )
+        )
+        row = QHBoxLayout()
+        self.daily = QCheckBox("Run the daily check at")
+        self.daily_time = QTimeEdit()
+        self.daily_time.setDisplayFormat("HH:mm")
+        settings = self.ctl.engine.history.get_setting("daily_check", {}) or {}
+        hh, mm = (settings.get("time") or "12:00").split(":")
+        self.daily_time.setTime(QTime(int(hh), int(mm)))
+        self.daily.setChecked(bool(settings.get("enabled")))
+        row.addWidget(self.daily)
+        row.addWidget(self.daily_time)
+        apply_btn = QPushButton("Apply")
+        apply_btn.clicked.connect(self._apply_daily)
+        row.addWidget(apply_btn)
+        row.addStretch(1)
+        dl.addLayout(row)
+        self.daily_status = label("", object_name="Dim")
+        dl.addWidget(self.daily_status)
+        self.extra.addWidget(dc)
+
+    def _apply_daily(self) -> None:
+        enable = self.daily.isChecked()
+        time = self.daily_time.time().toString("HH:mm")
+        self.ctl.set_daily_check(enable, time)
 
     def _fill_networks(self) -> None:
         from ...core import lan

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..models import ActionSpec
@@ -46,7 +47,11 @@ for _check in CHECKS:
 EXTRA_ALLOWS: list[Allow] = [
     Allow(
         "task.schedule",
-        lambda p: p.get("name") == r"\SimplySec\Daily check" and isinstance(p.get("time"), str),
+        lambda p: (
+            p.get("name") == r"\SimplySec\Daily check"
+            and isinstance(p.get("time"), str)
+            and bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", p["time"]))
+        ),
     ),
 ]
 

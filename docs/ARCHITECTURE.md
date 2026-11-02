@@ -197,6 +197,18 @@ reported as *Managed* and never changed.
   (firewalls, secure configuration, user access control, malware protection, security update
   management), followed by reachable ports, devices, router, changes made and accepted risks.
 
+## Background monitoring (`core/monitor.py`, `windows/scheduler.py`, `windows/toast.py`)
+
+* Settings > Daily check (or `simplysec monitor --enable HH:MM` / `--disable`) creates or removes
+  the task `\SimplySec\Daily check` from XML: daily, as the signed-in user, highest privileges,
+  only while that user is signed in. Creating it is a journaled `task.schedule` change, so it
+  appears on the Changes page and can be undone; moving the time undoes the old change first.
+* `simplysec monitor --run` (what the task runs) does a read-only scan, also scans confirmed home
+  networks, saves the result and compares it with the previous scan. It never applies fixes.
+* It shows a Windows toast (PowerShell's WinRT bridge, using PowerShell's registered app id, so
+  no extra package) only when the score dropped by 5 or more, a new High or Critical finding
+  appeared, a new device joined, or antivirus or the firewall was turned off.
+
 ## Knowledge base
 
 `core/knowledge/ports.toml`, `programs.toml` and `services.toml` are the single source of truth

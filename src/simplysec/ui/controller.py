@@ -117,6 +117,52 @@ class Controller(QObject):
             on_finished=lambda: self._set_busy(False),
         )
 
+    def set_daily_check(self, enable: bool, time: str) -> None:
+        if self.busy:
+            return
+        self._set_busy(True, "Updating the daily check…")
+
+        def work(progress: Any) -> str:
+            from ..core import monitor
+
+            if self.is_admin:
+                if enable:
+                    res = monitor.enable(self.engine, time)
+                    return (
+                        f"Daily check scheduled at {time}."
+                        if res.ok
+                        else "Could not schedule the daily check."
+                    )
+                return (
+                    "Daily check removed."
+                    if monitor.disable(self.engine)
+                    else "Could not remove the daily check."
+                )
+            argv = ["monitor", "--enable", time] if enable else ["monitor", "--disable"]
+            code = elevation.run_elevated_and_wait(argv)
+            if code is None:
+                return "Administrator permission was not given, so nothing changed."
+            if code == 0:
+                settings = self.engine.history.get_setting(monitor.SETTING, {}) or {}
+                self.engine.history.set_setting(
+                    monitor.SETTING, {**settings, "enabled": enable, "time": time}
+                )
+            return "Done." if code == 0 else f"Finished with problems (code {code})."
+
+        def done(message: str) -> None:
+            self.changes_updated.emit()
+            if self.result is not None:
+                self.scan_finished.emit(self.result)
+            QMessageBox.information(self.window, "Daily check", message)
+
+        run_in_background(
+            work,
+            on_result=done,
+            on_error=lambda e: self.error.emit(f"Could not change the daily check: {e}"),
+            on_progress=self.progress.emit,
+            on_finished=lambda: self._set_busy(False),
+        )
+
     # ----------------------------------------------------------------- keep
     def keep(self, finding: Finding) -> None:
         if not finding.keep_key:

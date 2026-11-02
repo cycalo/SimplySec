@@ -52,6 +52,8 @@ simplysec changes                           everything SimplySec changed
 simplysec undo --change N | --batch N | --all | --rules
 simplysec history                           saved scans with score changes
 simplysec report --html [PATH]              printable HTML report
+simplysec monitor --enable [HH:MM]          daily background check (administrator; undoable)
+simplysec monitor --disable | --run
 ```
 
 `fix` and `undo` need an elevated prompt (or `--elevate` for a UAC prompt).

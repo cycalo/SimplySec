@@ -9,6 +9,7 @@ import ctypes
 import logging
 import subprocess
 import sys
+from pathlib import Path
 
 from .paths import is_frozen
 
@@ -22,9 +23,14 @@ def is_admin() -> bool:
         return False
 
 
-def _command(args: list[str], gui: bool) -> tuple[str, str]:
+def command_for(args: list[str], gui: bool) -> tuple[str, str]:
+    """(program, arguments) that run SimplySec itself, from source or as the frozen exe."""
     if is_frozen():
-        return sys.executable, subprocess.list2cmdline(args)
+        # The bundle has a windowed SimplySec.exe and a console simplysec-cli.exe side by side.
+        folder = Path(sys.executable).parent
+        sibling = folder / ("SimplySec.exe" if gui else "simplysec-cli.exe")
+        exe = str(sibling) if sibling.exists() else sys.executable
+        return exe, subprocess.list2cmdline(args)
     exe = sys.executable
     if gui and exe.lower().endswith("python.exe"):
         candidate = exe[: -len("python.exe")] + "pythonw.exe"
@@ -34,7 +40,7 @@ def _command(args: list[str], gui: bool) -> tuple[str, str]:
 
 def relaunch_elevated(args: list[str] | None = None, gui: bool = True) -> bool:
     """Start a new elevated instance via the UAC prompt. Returns False if the user declined."""
-    exe, params = _command(args or [], gui)
+    exe, params = command_for(args or [], gui)
     log.info("relaunching elevated: %s %s", exe, params)
     rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 1)
     return int(rc) > 32
@@ -47,7 +53,7 @@ def run_elevated_and_wait(args: list[str], timeout_ms: int = 600_000) -> int | N
     import win32process
     from win32com.shell import shell, shellcon
 
-    exe, params = _command(args, gui=False)
+    exe, params = command_for(args, gui=False)
     try:
         info = shell.ShellExecuteEx(
             fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
