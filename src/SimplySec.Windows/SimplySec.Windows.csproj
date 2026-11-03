@@ -11,9 +11,12 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Management" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="..\simplysec\windows\scripts\facts.ps1" LogicalName="scripts/facts.ps1" />
+    <None Include="..\simplysec\windows\scripts\facts.ps1" Link="scripts\facts.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SimplySec.Windows.Tests" />
