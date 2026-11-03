@@ -12,7 +12,7 @@ runs; it is the reference ("oracle") for the port.
 | P1 Core foundations | done | `53d6602` (with P2) |
 | P2 Checks, impact, analysis | done | `53d6602` |
 | P3 Actions, journal, history, engine apply/undo, daily check, LAN/router, report | done | `1c5c6c5` |
-| P4 Windows layer + CLI | **in progress**: steps 1–3 done on 2026-11-03 (smoke run, live parity gate 3/3, Windows tests); step 4 (elevated checks) needs the user at an elevated prompt | WIP `3810a59` + uncommitted work |
+| P4 Windows layer + CLI | **done** 2026-11-03: smoke run, live parity gate 3/3, Windows tests, elevated checks | WIP `3810a59` + P4 commit |
 | P5 WPF app, P6 remove PowerShell, P7 packaging, P8 cutover | not started | |
 
 `dotnet test --project tests/SimplySec.Windows.Tests` → **21 pass, 2 skipped** (admin, opt-in), about 2 s.
@@ -71,14 +71,18 @@ Shared data still lives in the Python tree, linked by the C# projects:
 - **Signatures of unreadable files** (e.g. protected Xbox game folders): `Get-AuthenticodeSignature` throws (v2 records `Unreadable`); WinTrust said `NotSigned`. `WinTrust.Verify` now returns `Unreadable` when the file can't be opened.
 - The usage error now lists the choices, like argparse.
 
-## Next steps (finish P4)
+4. **Elevated checks**, all passed, run by the user from an elevated prompt:
+   - admin tests 2/2 (`$env:SIMPLYSEC_ADMIN_TESTS=1; dotnet test --project tests/SimplySec.Windows.Tests -- --filter-trait "Category=Admin"`);
+   - CLI `fix` / `undo` for Remote Assistance and for a firewall block, plus `monitor --enable/--disable`;
+   - phone: `python -m http.server 8765` loaded, couldn't be reached while blocked, loaded again after undo;
+   - a change made by Python v2 (`fix`) was listed and undone by C#.
+   - Not yet exercised: `fix --elevate` from a normal prompt (the UAC relaunch path).
 
-1. **Elevated checks** (need the user at an elevated prompt):
-   - `$env:SIMPLYSEC_ADMIN_TESTS=1; dotnet test --project tests/SimplySec.Windows.Tests -- --filter-trait "Category=Admin"`;
-   - CLI `fix`, `undo`, `monitor --enable/--disable` (and `fix --elevate` from a normal prompt for the UAC path);
-   - check port 8765 from a phone;
-   - undo a change made by the Python build.
-2. Commit at the P4 gate, then P5 (WPF + WPF-UI, following the documented PySide6 pages and flows).
+   Tip: Windows Firewall only blocks *new* connections. A phone that already has a connection open can keep loading until that connection closes.
+
+## Next steps
+
+1. P5: the WPF app (WPF-UI), following the documented PySide6 pages and flows.
 
 **After cutover (not for parity):** v2 de-duplicates listeners by (protocol, address, port) and keeps the first PID. UDP 5353 is shared by several programs (svchost, adb, NVIDIA…), so the owner, and with it the findings and score (31 vs 33 here), changes from scan to scan.
 
