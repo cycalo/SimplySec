@@ -67,7 +67,7 @@ public sealed class Cli(CliHost host)
     private static readonly Dictionary<string, (string[] Flags, string[] Single, string[] Multi, string[] Optional, int MaxPositional)> Spec = new(StringComparer.Ordinal)
     {
         ["scan"] = (["--json", "--facts", "--no-save", "--network", "--deep", "--yes", "--raw"], ["--from-raw"], [], [], 0),
-        ["fix"] = (["--yes", "--restore-point", "--mark-private", "--elevate"], ["--finding", "--fix"], ["--select"], [], 1),
+        ["fix"] = (["--yes", "--restore-point", "--mark-private", "--elevate"], ["--finding", "--fix"], ["--select", "--private-network"], [], 1),
         ["keep"] = (["--undo"], ["--finding"], [], [], 0),
         ["undo"] = (["--all", "--rules", "--yes", "--elevate"], ["--batch"], ["--change"], [], 0),
         ["changes"] = ([], [], [], [], 0),
@@ -119,7 +119,7 @@ public sealed class Cli(CliHost host)
                 a.Flags.Add(t);
                 i++;
             }
-            else if (spec.Single.Contains(t) || (spec.Multi.Contains(t) && t == "--select"))
+            else if (spec.Single.Contains(t) || (spec.Multi.Contains(t) && t is "--select" or "--private-network"))
             {
                 if (i + 1 >= argv.Length)
                 {
@@ -181,12 +181,15 @@ public sealed class Cli(CliHost host)
                 return null;
             }
         }
-        foreach (var v in a.All("--change"))
+        foreach (var k in new[] { "--change", "--private-network" })
         {
-            if (!int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+            foreach (var v in a.All(k))
             {
-                error = $"argument --change: invalid int value: '{v}'";
-                return null;
+                if (!int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                {
+                    error = $"argument {k}: invalid int value: '{v}'";
+                    return null;
+                }
             }
         }
         if (a.Command == "keep" && a.Value("--finding") is null)
@@ -471,14 +474,19 @@ public sealed class Cli(CliHost host)
                 }
                 selections.Add(new Selection(opt.FixId, opt.Params, f.Id));
             }
-            if (a.Has("--mark-private"))
+            // --mark-private: every offered "mark this network Private first"; --private-network N:
+            // only the offer for interface index N (the GUI passes exactly the ticked ones).
+            var privateNets = a.All("--private-network").Select(v => long.Parse(v, CultureInfo.InvariantCulture)).ToHashSet();
+            if (a.Has("--mark-private") || privateNets.Count > 0)
             {
                 var extra = new List<Selection>();
                 foreach (var item in engine.Plan(selections).Items)
                 {
                     foreach (var w in item.Warnings)
                     {
-                        if (w.OfferFix is not null && extra.All(s => !Js.PyEquals(s.Params, w.OfferParams)))
+                        var wanted = a.Has("--mark-private")
+                            || (w.OfferFix == "network.mark_private" && privateNets.Contains(Js.Long(w.OfferParams["index"])));
+                        if (wanted && w.OfferFix is not null && extra.All(s => !Js.PyEquals(s.Params, w.OfferParams)))
                         {
                             extra.Add(new Selection(w.OfferFix, (JsonObject)w.OfferParams.DeepClone()));
                         }

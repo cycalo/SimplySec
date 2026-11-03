@@ -12,10 +12,13 @@ runs; it is the reference ("oracle") for the port.
 | P1 Core foundations | done | `53d6602` (with P2) |
 | P2 Checks, impact, analysis | done | `53d6602` |
 | P3 Actions, journal, history, engine apply/undo, daily check, LAN/router, report | done | `1c5c6c5` |
-| P4 Windows layer + CLI | **done** 2026-11-03: smoke run, live parity gate 3/3, Windows tests, elevated checks | WIP `3810a59` + P4 commit |
-| P5 WPF app, P6 remove PowerShell, P7 packaging, P8 cutover | not started | |
+| P4 Windows layer + CLI | **done** 2026-11-03: smoke run, live parity gate 3/3, Windows tests, elevated checks | `25633f8`, `d2a5c3f` |
+| P5 WPF app | **in progress**: app written, builds, renders every page and dialog in light and dark (snapshots), real scan works in the window, view-model tests pass; **manual checklist with the user still to do** | not committed yet |
+| P6 remove PowerShell, P7 packaging, P8 cutover | not started | |
 
-`dotnet test --project tests/SimplySec.Windows.Tests` → **21 pass, 2 skipped** (admin, opt-in), about 2 s.
+`dotnet test --project tests/SimplySec.App.Tests` → **15 pass** (about 4 s).
+
+`dotnet test --project tests/SimplySec.Windows.Tests` → **22 pass, 2 skipped** (admin, opt-in), about 2 s.
 
 `dotnet test --project tests/SimplySec.Core.Tests` → **51 tests pass** (about 25 s). They include:
 - 2,545 exposure cases plus the PC fixture;
@@ -38,8 +41,14 @@ src/SimplySec.Windows/     Interop/ (FirewallCom, IpHelper, WinTrust, Native), R
                            Elevation, Logging, WindowsHost), Collector
 src/SimplySec.Commands/    Cli.cs: every subcommand, texts, exit codes (CliHost injects the OS for tests)
 src/SimplySec.Cli/         simplysec-cli.exe (asInvoker manifest)
+src/SimplySec.App/         SimplySec.exe (WPF + WPF-UI, all built in code, no XAML). Program (CLI mode with
+                           arguments, dev switches), Infrastructure/ (BackgroundRunner, IAppServices, IDialogs,
+                           Snapshots), ViewModels/ (MainViewModel = controller.py, PreviewModel), Views/ (MainWindow
+                           + 7 pages), Controls/ (FindingCard, ScoreRing, TrendChart, ProgressPanel), Dialogs/,
+                           Theme/ (Palette: severity/grade/impact colours per theme; Ui: text/card builders)
 tests/SimplySec.Core.Tests golden + ported tests; Support/ (Golden loader, JsonAssert, Fakes, Pinned clock)
 tests/SimplySec.Windows.Tests CLI (fakes), XML parsing, native interop (read-only), admin e2e (opt-in)
+tests/SimplySec.App.Tests  view model on fakes (elevated path runs the real CLI), runner, window and Changes page
 tests/golden/              JSON from Python (gzip) + compat/ (journal.db, history.db written by Python)
 tools/parity/              export_golden.py (regenerate goldens), spike_compare.py (P0 spikes vs Python),
                            dump_raw.py + compare_live.py (live parity on this PC)
@@ -80,9 +89,40 @@ Shared data still lives in the Python tree, linked by the C# projects:
 
    Tip: Windows Firewall only blocks *new* connections. A phone that already has a connection open can keep loading until that connection closes.
 
+## P5 (2026-11-03)
+
+**What's built:**
+- FluentWindow + NavigationView, with the 7 pages in v2's order. The mode badge and "Restart as administrator" sit in the pane footer, the ProgressPanel in the NavigationView header, and the status bar at the bottom. Mica is used, and the theme follows Windows live: code-chosen colours are rebuilt on change.
+- **Pages build their content in code, like v2's Qt pages.** Text is added as Runs, never parsed as markup, so finding text can't inject formatting. That replaces v2's `html.escape` in labels.
+- Pages can opt out of the NavigationView's outer scroll viewer with `ScrollViewer.CanContentScroll=true` on the page, and every page scrolls itself.
+- **Fixes:** in-process when admin; otherwise one elevated helper call (`SimplySec.exe` in CLI mode, or `simplysec-cli.exe` when it sits next to it), then the results are read back from the journal.
+
+**UI quirks fixed (from the review):**
+- The busy text no longer stays after a failed scan.
+- "Undo everything" is enabled only when something is active.
+- Selecting several batches undoes their active changes: the Changes tree is now a flat list with batch rows, because WPF's TreeView can't multi-select.
+- "Finished with code 1" isn't shown when the only problem is a finding still present.
+- Only the networks the user ticked are marked Private. This needed a new CLI flag, `fix --private-network INDEX` (repeatable); `--mark-private` still means all of them.
+
+**Developer switches:**
+- `SimplySec.exe --load-raw FILE` shows a saved `scan --raw`.
+- Add `--snapshot DIR` to render every page plus the preview and result dialogs to PNG and exit. `--snapshot DIR` alone scans this PC first.
+- `SIMPLYSEC_THEME=light|dark` forces a theme.
+
+**Manual checklist still to run (the P5 gate), in light and dark:**
+- every page;
+- preview → UAC → apply → result → Changes → undo;
+- "Restart as administrator";
+- the daily-check toggle;
+- report export;
+- a network scan compared with the router's DHCP list;
+- Ports "Review…" and the double-click details;
+- the device "Trusted" checkbox and jump-to-card.
+
 ## Next steps
 
-1. P5: the WPF app (WPF-UI), following the documented PySide6 pages and flows.
+1. Run the P5 manual checklist with the user, fix what it finds, then commit P5.
+2. P6: replace `facts.ps1` and the PowerShell setters/usage/toasts with native code.
 
 **After cutover (not for parity):** v2 de-duplicates listeners by (protocol, address, port) and keeps the first PID. UDP 5353 is shared by several programs (svchost, adb, NVIDIA…), so the owner, and with it the findings and score (31 vs 33 here), changes from scan to scan.
 

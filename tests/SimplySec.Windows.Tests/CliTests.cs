@@ -87,6 +87,13 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void PrivateNetworkNeedsAnInterfaceIndex()
+    {
+        Assert.Equal(Cli.ExitUsage, FakeCli(admin: true).Run(["fix", "--finding", "a", "--fix", "b", "--private-network", "home"]));
+        Assert.Contains("argument --private-network: invalid int value: 'home'", _err.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FixFlowEndToEndWithFakes()
     {
         var (engine, adapters) = TestEngines.Make(_tmp, admin: true, Raw());

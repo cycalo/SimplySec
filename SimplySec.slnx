@@ -3,9 +3,11 @@
     <Project Path="src/SimplySec.Core/SimplySec.Core.csproj" />
     <Project Path="src/SimplySec.Windows/SimplySec.Windows.csproj" />
     <Project Path="src/SimplySec.Commands/SimplySec.Commands.csproj" />
+    <Project Path="src/SimplySec.App/SimplySec.App.csproj" />
     <Project Path="src/SimplySec.Cli/SimplySec.Cli.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SimplySec.App.Tests/SimplySec.App.Tests.csproj" />
     <Project Path="tests/SimplySec.Core.Tests/SimplySec.Core.Tests.csproj" />
     <Project Path="tests/SimplySec.Windows.Tests/SimplySec.Windows.Tests.csproj" />
   </Folder>
