@@ -12,8 +12,10 @@ runs; it is the reference ("oracle") for the port.
 | P1 Core foundations | done | `53d6602` (with P2) |
 | P2 Checks, impact, analysis | done | `53d6602` |
 | P3 Actions, journal, history, engine apply/undo, daily check, LAN/router, report | done | `1c5c6c5` |
-| P4 Windows layer + CLI | **in progress**: code written and **builds**; not yet run against the real OS or Python | WIP commit (see `git log`) |
+| P4 Windows layer + CLI | **in progress**: steps 1–3 done on 2026-11-03 (smoke run, live parity gate 3/3, Windows tests); step 4 (elevated checks) needs the user at an elevated prompt | WIP `3810a59` + uncommitted work |
 | P5 WPF app, P6 remove PowerShell, P7 packaging, P8 cutover | not started | |
+
+`dotnet test --project tests/SimplySec.Windows.Tests` → **21 pass, 2 skipped** (admin, opt-in), about 2 s.
 
 `dotnet test --project tests/SimplySec.Core.Tests` → **51 tests pass** (about 25 s). They include:
 - 2,545 exposure cases plus the PC fixture;
@@ -37,8 +39,10 @@ src/SimplySec.Windows/     Interop/ (FirewallCom, IpHelper, WinTrust, Native), R
 src/SimplySec.Commands/    Cli.cs: every subcommand, texts, exit codes (CliHost injects the OS for tests)
 src/SimplySec.Cli/         simplysec-cli.exe (asInvoker manifest)
 tests/SimplySec.Core.Tests golden + ported tests; Support/ (Golden loader, JsonAssert, Fakes, Pinned clock)
+tests/SimplySec.Windows.Tests CLI (fakes), XML parsing, native interop (read-only), admin e2e (opt-in)
 tests/golden/              JSON from Python (gzip) + compat/ (journal.db, history.db written by Python)
-tools/parity/              export_golden.py (regenerate goldens), spike_compare.py (P0 spikes vs Python)
+tools/parity/              export_golden.py (regenerate goldens), spike_compare.py (P0 spikes vs Python),
+                           dump_raw.py + compare_live.py (live parity on this PC)
 tools/spikes/              spike console (firewall/sockets/sigs)
 ```
 
@@ -46,30 +50,37 @@ Shared data still lives in the Python tree, linked by the C# projects:
 - the knowledge-base TOMLs and `oui.csv.gz`, embedded in Core;
 - `facts.ps1`, copied to `scripts\` in the output.
 
+## Done in P4 (2026-11-03)
+
+1. **Smoke run.** `scan`, `scan --json/--raw/--from-raw`, `changes`, `history`, `report`, `--version` and usage errors all work. `changes`/`history` output is byte-identical to Python; `scan` text differs only by version, time and live drift.
+2. **Parity tooling.** `tools/parity/dump_raw.py` (Python collect / analyze) and `tools/parity/compare_live.py`. Run `.venv\Scripts\python tools\parity\compare_live.py [--runs 3] [--out DIR] [--all]`.
+   - Step 2 (same RawScan analysed by both, for Python's and C#'s raw) is strict and clean.
+   - Steps 1 and 3 separate real differences from live drift. A socket seen by one side only counts as drift unless it was open both before and after the two collections. UDP 5353 ownership and current connections are also drift.
+   - **Gate passed: 3/3 clean runs.**
+3. **Tests.** New `tests/SimplySec.Windows.Tests` (links Core.Tests `Support/Fakes.cs` and `Golden.cs`):
+   - `CliTests`: port of `test_cli.py`, plus the usage error text.
+   - `ParsingTests`: Wi-Fi profile (and DTD rejection), nmap XML.
+   - `NativeTests`: read-only, on this PC. Covers DOS-path conversion, image path via the NT fallback, loopback adapter, IPv4-before-IPv6 order, the PSModulePath regression and missing-file signatures.
+   - `AdminEndToEndTests` (`Category=Admin`): firewall block on 8765 + undo, Remote Assistance + undo. Skipped unless elevated **and** `SIMPLYSEC_ADMIN_TESTS=1`.
+
+### Runtime bugs found and fixed by the smoke/parity runs
+
+- **Listener `exe` empty for SYSTEM services when not elevated** (65 listeners). psutil gets the path with `NtQuerySystemInformation(SystemProcessIdInformation)` + `convert_dos_path`, without opening the process. `Listeners.ProcessExe` now falls back to the same (`NtImageName`, `ConvertDosPath`). This also fixed the user SIDs that depend on `exe` (parent-service and ALWAYS_SYSTEM rules).
+- **Interfaces.** .NET's `NetworkInterface` lists filter-driver pseudo-interfaces and keeps the OS address order. `Network.LocalInterfaces` now calls `GetAdaptersAddresses(AF_UNSPEC, 0)` directly, sorts addresses by family (IPv4 first, like psutil) and takes "up" from `GetIfTable` (oper 4/5 and admin up), as `net_if_stats` does.
+- **PSModulePath leak.** Started from PowerShell 7, `powershell.exe` 5.1 inherits 7's module path and can't load its own modules (`Get-AuthenticodeSignature` etc.). `Runner` now removes `PSModulePath` for every PowerShell child (`Run` env: a null value removes the variable). Python v2 has the same latent bug; `compare_live.py` strips the variable for both sides.
+- **Signatures of unreadable files** (e.g. protected Xbox game folders): `Get-AuthenticodeSignature` throws (v2 records `Unreadable`); WinTrust said `NotSigned`. `WinTrust.Verify` now returns `Unreadable` when the file can't be opened.
+- The usage error now lists the choices, like argparse.
+
 ## Next steps (finish P4)
 
-1. **Smoke-run the CLI on this PC.**
-   - `dotnet run --project src/SimplySec.Cli -- scan`, then `scan --json`, `scan --raw`, `changes`, `history`.
-   - Fix runtime issues. Likely candidates:
-     - the COM `Interfaces` VARIANT;
-     - the `MIB_IPNET_ROW2` layout;
-     - `USER_INFO_1` offsets;
-     - whether `facts.ps1` reaches the output folder;
-     - Serilog setup.
-2. **Parity tooling.** Write `tools/parity/dump_raw.py` (Python `windows.collect.collect()` → RawScan JSON) and `tools/parity/compare_live.py`, which checks three things:
-   1. the raw scan, section by section: listeners, rules, interfaces, signatures, env and each fact. Ignore UDP 5353 duplicates, timestamps and durations.
-   2. C# `scan --from-raw <python raw>` matches Python's `analyze()` of the same raw scan.
-   3. `scan --json` from both versions.
-
-   The gate is three clean runs in a row.
-3. **Tests.**
-   - Add a `tests/SimplySec.Windows.Tests` project: CLI tests with fakes (port `test_cli.py`), Wi-Fi XML (`test_lan` Wi-Fi part) and nmap XML parsing.
-   - Add admin end-to-end tests marked `[Trait("Category","Admin")]`: block a test listener on 8765 and undo it; Remote Assistance registry fix and undo.
-4. **Elevated checks** (from an elevated prompt):
-   - `fix`, `undo`, `monitor --enable/--disable`;
+1. **Elevated checks** (need the user at an elevated prompt):
+   - `$env:SIMPLYSEC_ADMIN_TESTS=1; dotnet test --project tests/SimplySec.Windows.Tests -- --filter-trait "Category=Admin"`;
+   - CLI `fix`, `undo`, `monitor --enable/--disable` (and `fix --elevate` from a normal prompt for the UAC path);
    - check port 8765 from a phone;
    - undo a change made by the Python build.
-5. Commit at the P4 gate, then P5 (WPF + WPF-UI, following the documented PySide6 pages and flows).
+2. Commit at the P4 gate, then P5 (WPF + WPF-UI, following the documented PySide6 pages and flows).
+
+**After cutover (not for parity):** v2 de-duplicates listeners by (protocol, address, port) and keeps the first PID. UDP 5353 is shared by several programs (svchost, adb, NVIDIA…), so the owner, and with it the findings and score (31 vs 33 here), changes from scan to scan.
 
 ## Decisions and deviations made during the session
 
@@ -98,4 +109,6 @@ Shared data still lives in the Python tree, linked by the C# projects:
 - **Analyzers** CA1304/1305/1309/1310/1311 are errors in src (relaxed in tests). Use `CultureInfo.InvariantCulture`, `string.Create(...)` and `StringComparison.Ordinal`.
 - **Windows projects** target `net10.0-windows10.0.19041.0`, with `SupportedOSPlatformVersion` 10.0.17763.0.
 - **The Bash tool** mangles some heredocs containing C#. Write C# files with the Write tool.
+- **Shell for parity runs:** this terminal is PowerShell 7. Anything that starts Windows PowerShell from it (Python v2, scripts) needs `PSModulePath` removed, or 5.1 can't load its built-in modules.
+- **Live parity is noisy by nature:** Chrome can open 100+ short-lived UDP sockets between two collections. Read `compare_live.py --all` before trusting a drift classification.
 - **Regenerating goldens:** `.venv\Scripts\python tools\parity\export_golden.py` (takes about 2 minutes). Commit the `.json.gz` files and `compat/*.db`; there is a `.gitignore` exception for those.

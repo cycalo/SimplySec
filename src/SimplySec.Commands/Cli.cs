@@ -108,7 +108,7 @@ public sealed class Cli(CliHost host)
         a.Command = argv[i++];
         if (!Spec.TryGetValue(a.Command, out var spec))
         {
-            error = $"argument command: invalid choice: '{a.Command}'";
+            error = $"argument command: invalid choice: '{a.Command}' (choose from {string.Join(", ", Spec.Keys.Select(k => $"'{k}'"))})";
             return null;
         }
         while (i < argv.Length)

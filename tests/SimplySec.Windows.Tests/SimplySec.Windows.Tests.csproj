@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    OS layer and CLI tests. Most use fakes or recorded fixtures; a few read this PC (read-only).
+    Admin end-to-end tests (Category=Admin) change this PC and undo it; they only run from an
+    elevated prompt with SIMPLYSEC_ADMIN_TESTS=1.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>SimplySec.Windows.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);CA1304;CA1305;CA1309;CA1310;CA1311</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SimplySec.Commands\SimplySec.Commands.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SimplySec.Core.Tests\Support\Fakes.cs" Link="Support\Fakes.cs" />
+    <Compile Include="..\SimplySec.Core.Tests\Support\Golden.cs" Link="Support\Golden.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

@@ -127,8 +127,10 @@ internal static partial class WinTrust
 
     public static Result Verify(string path)
     {
-        if (!File.Exists(path))
+        if (!File.Exists(path) || !CanRead(path))
         {
+            // Get-AuthenticodeSignature throws for these (e.g. protected game folders), which v2
+            // recorded as Unreadable; WinTrust alone would answer NotSigned.
             return new Result("Unreadable", "");
         }
         var embedded = VerifyEmbedded(path);
@@ -138,6 +140,19 @@ internal static partial class WinTrust
         }
         var catalog = VerifyCatalog(path);
         return catalog ?? embedded;
+    }
+
+    private static bool CanRead(string path)
+    {
+        try
+        {
+            using var _ = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return true;
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
     }
 
     private static Result VerifyEmbedded(string path)

@@ -1,5 +1,3 @@
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -58,32 +56,131 @@ public sealed partial class Network : INetworkAdapter
         return PyIp.Format(bytes.Length == 4 ? 4 : 6, v);
     }
 
+    [LibraryImport("iphlpapi.dll")]
+    private static partial uint GetAdaptersAddresses(uint family, uint flags, IntPtr reserved, IntPtr addresses, ref uint size);
+
+    [LibraryImport("iphlpapi.dll")]
+    private static partial uint GetIfTable(IntPtr table, ref uint size, [MarshalAs(UnmanagedType.Bool)] bool order);
+
+    private const uint ErrorBufferOverflow = 111;
+    private const uint ErrorInsufficientBuffer = 122;
+
+    private sealed record RawAdapter(uint IfIndex, string FriendlyName, string Mac, List<(int Family, string Text)> Addresses);
+
+    /// <summary>GetAdaptersAddresses(AF_UNSPEC, 0) as psutil reads it (offsets work for 32- and 64-bit).</summary>
+    private static List<RawAdapter> ReadAdapters()
+    {
+        var size = 16384u;
+        for (var attempt = 0; ; attempt++)
+        {
+            var buf = Marshal.AllocHGlobal((int)size);
+            try
+            {
+                var rc = GetAdaptersAddresses(0, 0, IntPtr.Zero, buf, ref size);
+                if (rc == ErrorBufferOverflow && attempt < 5)
+                {
+                    continue;
+                }
+                if (rc != 0)
+                {
+                    throw new System.ComponentModel.Win32Exception((int)rc);
+                }
+                var output = new List<RawAdapter>();
+                var p = IntPtr.Size;
+                for (var a = buf; a != IntPtr.Zero; a = Marshal.ReadIntPtr(a, 8))
+                {
+                    var ifIndex = (uint)Marshal.ReadInt32(a, 4);
+                    var friendly = Marshal.PtrToStringUni(Marshal.ReadIntPtr(a, 8 + 8 * p)) ?? "";
+                    var macLen = Marshal.ReadInt32(a, 16 + 9 * p);
+                    var mac = string.Join('-', Enumerable.Range(0, Math.Min(macLen, 8))
+                        .Select(i => Marshal.ReadByte(a, 8 + 9 * p + i).ToString("X2", System.Globalization.CultureInfo.InvariantCulture)));
+                    var addrs = new List<(int, string)>();
+                    for (var u = Marshal.ReadIntPtr(a, 8 + 2 * p); u != IntPtr.Zero; u = Marshal.ReadIntPtr(u, 8))
+                    {
+                        var sa = Marshal.ReadIntPtr(u, 8 + p);
+                        var family = (ushort)Marshal.ReadInt16(sa);
+                        if (family == 2)
+                        {
+                            var bytes = new byte[4];
+                            Marshal.Copy(sa + 4, bytes, 0, 4);
+                            var prefix = Marshal.ReadByte(u, 8 + 3 * p + 24);
+                            addrs.Add((2, $"{FormatAddress(new System.Net.IPAddress(bytes))}/{prefix}"));
+                        }
+                        else if (family == 23)
+                        {
+                            var bytes = new byte[16];
+                            Marshal.Copy(sa + 8, bytes, 0, 16);
+                            // psutil reports no IPv6 netmask, so v2 stored every IPv6 address as /128.
+                            addrs.Add((23, $"{FormatAddress(new System.Net.IPAddress(bytes))}/128"));
+                        }
+                    }
+                    output.Add(new RawAdapter(ifIndex, friendly, mac, addrs));
+                }
+                return output;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buf);
+            }
+        }
+    }
+
+    /// <summary>psutil.net_if_stats isup: GetIfTable rows (oper connected/operational, admin up) by adapter name.</summary>
+    private static Dictionary<string, bool> ReadUp(List<RawAdapter> adapters)
+    {
+        var output = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var size = 0u;
+        var rc = GetIfTable(IntPtr.Zero, ref size, false);
+        if (rc != ErrorInsufficientBuffer && rc != 0)
+        {
+            return output;
+        }
+        var buf = Marshal.AllocHGlobal((int)size + 8192);
+        try
+        {
+            size += 8192;
+            if (GetIfTable(buf, ref size, false) != 0)
+            {
+                return output;
+            }
+            const int rowSize = 860; // MIB_IFROW
+            var count = Marshal.ReadInt32(buf);
+            for (var i = 0; i < count; i++)
+            {
+                var row = buf + 4 + i * rowSize;
+                var index = (uint)Marshal.ReadInt32(row, 512);
+                var admin = Marshal.ReadInt32(row, 540);
+                var oper = Marshal.ReadInt32(row, 544);
+                var adapter = adapters.FirstOrDefault(a => a.IfIndex == index);
+                if (adapter is null)
+                {
+                    continue;
+                }
+                output[adapter.FriendlyName] = oper is 4 or 5 && admin == 1;
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buf);
+        }
+        return output;
+    }
+
     /// <summary>psutil.net_if_addrs + net_if_stats: friendly name → (addresses "ip/prefix", MAC, up).</summary>
     internal static List<(string Alias, List<string> Addresses, string Mac, bool Up)> LocalInterfaces()
     {
+        var adapters = ReadAdapters();
+        var up = ReadUp(adapters);
         var output = new List<(string, List<string>, string, bool)>();
-        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+        foreach (var a in adapters)
         {
-            var mac = ni.GetPhysicalAddress().GetAddressBytes();
-            var macText = mac.Length > 0 ? string.Join('-', mac.Select(b => b.ToString("X2", System.Globalization.CultureInfo.InvariantCulture))) : "";
-            var addresses = new List<string>();
-            foreach (var ua in ni.GetIPProperties().UnicastAddresses)
-            {
-                if (ua.Address.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    addresses.Add($"{FormatAddress(ua.Address)}/{ua.PrefixLength}");
-                }
-                else if (ua.Address.AddressFamily == AddressFamily.InterNetworkV6)
-                {
-                    // psutil reports no IPv6 netmask, so v2 stored every IPv6 address as /128.
-                    addresses.Add($"{FormatAddress(ua.Address)}/128");
-                }
-            }
-            if (macText.Length == 0 && addresses.Count == 0)
+            if (a.Mac.Length == 0 && a.Addresses.Count == 0)
             {
                 continue;
             }
-            output.Add((ni.Name, addresses, macText, ni.OperationalStatus == OperationalStatus.Up));
+            // psutil sorts every address by family (stable): IPv4 before IPv6.
+            var addresses = a.Addresses.Where(x => x.Family == 2).Concat(a.Addresses.Where(x => x.Family == 23)).Select(x => x.Text).ToList();
+            output.Add((a.FriendlyName, addresses, a.Mac, up.GetValueOrDefault(a.FriendlyName)));
         }
         return output;
     }

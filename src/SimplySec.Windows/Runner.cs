@@ -25,8 +25,9 @@ public static class Runner
     public static readonly string System32 = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "System32");
     public static readonly string PowerShellExe = Path.Combine(System32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
+    /// <summary>Run a program. In <paramref name="env"/>, a null value removes that variable.</summary>
     public static RunResult Run(IReadOnlyList<string> args, double timeout = 60, bool check = false, string? input = null,
-        IDictionary<string, string>? env = null)
+        IDictionary<string, string?>? env = null)
     {
         var psi = new ProcessStartInfo(args[0])
         {
@@ -42,9 +43,16 @@ public static class Runner
         {
             psi.ArgumentList.Add(a);
         }
-        foreach (var (k, v) in env ?? new Dictionary<string, string>())
+        foreach (var (k, v) in env ?? new Dictionary<string, string?>())
         {
-            psi.Environment[k] = v;
+            if (v is null)
+            {
+                psi.Environment.Remove(k);
+            }
+            else
+            {
+                psi.Environment[k] = v;
+            }
         }
         var name = Path.GetFileName(args[0]);
         Process proc;
@@ -108,10 +116,17 @@ public static class Runner
     private static string[] PsArgs(params string[] tail) =>
         [PowerShellExe, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", .. tail];
 
+    /// <summary>
+    /// Environment for Windows PowerShell. PSModulePath is dropped so 5.1 rebuilds its own: when
+    /// SimplySec is started from PowerShell 7 it inherits 7's module folders, and 5.1 then fails
+    /// to load built-in modules (Get-AuthenticodeSignature, NetSecurity, ...).
+    /// </summary>
+    private static Dictionary<string, string?> PsEnv() => new(StringComparer.OrdinalIgnoreCase) { ["PSModulePath"] = null };
+
     /// <summary>Run an inline PowerShell script; <c>$P</c> holds the parameters (decoded from JSON).</summary>
     public static RunResult PowerShell(string script, JsonNode? parameters = null, double timeout = 90)
     {
-        var env = new Dictionary<string, string>();
+        var env = PsEnv();
         if (parameters is not null)
         {
             env["SIMPLYSEC_PARAMS"] = Convert.ToBase64String(Encoding.UTF8.GetBytes(parameters.ToJsonString()));
@@ -154,7 +169,7 @@ public static class Runner
     /// <summary>Run a bundled .ps1 that prints JSON.</summary>
     public static JsonNode? PowerShellFile(string path, double timeout = 120)
     {
-        var res = Run(PsArgs("-File", path), timeout);
+        var res = Run(PsArgs("-File", path), timeout, env: PsEnv());
         var name = Path.GetFileName(path);
         if (!res.Ok)
         {

@@ -39,6 +39,27 @@ internal static partial class Native
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
 
+    // ---------------------------------------------------------------- image path for any PID
+
+    public const int SystemProcessIdInformationClass = 88;
+    public const int StatusInfoLengthMismatch = unchecked((int)0xC0000004);
+
+    /// <summary>SYSTEM_PROCESS_ID_INFORMATION: { HANDLE ProcessId; UNICODE_STRING ImageName; }.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SystemProcessIdInformation
+    {
+        public IntPtr ProcessId;
+        public ushort Length;
+        public ushort MaximumLength;
+        public IntPtr Buffer;
+    }
+
+    [LibraryImport("ntdll.dll")]
+    public static partial int NtQuerySystemInformation(int infoClass, ref SystemProcessIdInformation info, int length, IntPtr returnLength);
+
+    [LibraryImport("kernel32.dll", SetLastError = true, EntryPoint = "QueryDosDeviceW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int QueryDosDevice(string deviceName, [Out] char[] targetPath, int max);
+
     // ---------------------------------------------------------------- toolhelp
 
     public const uint Th32csSnapProcess = 0x2;

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using SimplySec.Core.Compat;
@@ -62,23 +63,107 @@ public static class Listeners
         return output;
     }
 
+    /// <summary>
+    /// Program path of a process, like psutil's Process.exe(): it works for every PID (including
+    /// SYSTEM services when not elevated) because the kernel's image name is asked for by PID.
+    /// </summary>
     internal static string ProcessExe(int pid)
     {
-        var h = Native.OpenProcess(Native.ProcessQueryLimitedInformation, false, pid);
-        if (h == IntPtr.Zero)
+        if (pid == 0)
         {
             return "";
         }
+        var h = Native.OpenProcess(Native.ProcessQueryLimitedInformation, false, pid);
+        if (h != IntPtr.Zero)
+        {
+            try
+            {
+                var size = 32768;
+                var sb = new StringBuilder(size);
+                if (Native.QueryFullProcessImageName(h, 0, sb, ref size))
+                {
+                    return sb.ToString();
+                }
+            }
+            finally
+            {
+                Native.CloseHandle(h);
+            }
+        }
+        var nt = NtImageName(pid);
+        return nt.Length > 0 ? ConvertDosPath(nt) : "";
+    }
+
+    /// <summary>NT image name ("\Device\HarddiskVolume3\...") of a PID; "" when unknown.</summary>
+    internal static string NtImageName(int pid)
+    {
+        const int bytes = 65534; // UNICODE_STRING.MaximumLength is a USHORT
+        var buf = Marshal.AllocHGlobal(bytes);
         try
         {
-            var size = 32768;
-            var sb = new StringBuilder(size);
-            return Native.QueryFullProcessImageName(h, 0, sb, ref size) ? sb.ToString() : "";
+            var info = new Native.SystemProcessIdInformation
+            {
+                ProcessId = pid,
+                Length = 0,
+                MaximumLength = bytes,
+                Buffer = buf,
+            };
+            var status = Native.NtQuerySystemInformation(Native.SystemProcessIdInformationClass, ref info,
+                Marshal.SizeOf<Native.SystemProcessIdInformation>(), IntPtr.Zero);
+            return status == 0 && info.Length > 0 ? Marshal.PtrToStringUni(buf, info.Length / 2) : "";
         }
         finally
         {
-            Native.CloseHandle(h);
+            Marshal.FreeHGlobal(buf);
         }
+    }
+
+    /// <summary>psutil's convert_dos_path: "\Device\HarddiskVolume1\x" → "C:\x".</summary>
+    internal static string ConvertDosPath(string s)
+    {
+        if (s.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return s;
+        }
+        var parts = s.Split('\\');
+        var rawdrive = string.Join('\\', parts.Take(3));
+        string driveletter;
+        if (rawdrive is @"\??\UNC" or @"\Device\Mup")
+        {
+            rawdrive = string.Join('\\', parts.Take(5));
+            driveletter = @"\\" + string.Join('\\', parts.Skip(3).Take(2));
+        }
+        else if (rawdrive.StartsWith(@"\??\", StringComparison.Ordinal))
+        {
+            driveletter = parts[2];
+        }
+        else
+        {
+            driveletter = DriveForDevice(rawdrive);
+        }
+        // ntpath.join(drive, remainder): the remainder is "" or starts with a backslash.
+        return driveletter + s[rawdrive.Length..];
+    }
+
+    /// <summary>The "X:" whose DOS device target equals <paramref name="device"/> (case-sensitive), or "".</summary>
+    private static string DriveForDevice(string device)
+    {
+        var target = new char[512];
+        for (var c = 'A'; c <= 'Z'; c++)
+        {
+            var drive = string.Create(CultureInfo.InvariantCulture, $"{c}:");
+            var n = Native.QueryDosDevice(drive, target, target.Length - 1);
+            if (n == 0)
+            {
+                continue;
+            }
+            var first = new string(target, 0, Array.IndexOf(target, '\0') is var z and >= 0 ? z : n);
+            if (first == device)
+            {
+                return drive;
+            }
+        }
+        return "";
     }
 
     private static byte[]? TokenInfo(IntPtr token, int cls)
