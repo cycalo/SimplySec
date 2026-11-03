@@ -8,7 +8,7 @@ using SimplySec.Core.Model;
 namespace SimplySec.App.ViewModels;
 
 /// <summary>
-/// The preview dialog's content and choices (port of PreviewDialog's logic in fix_dialogs.py).
+/// The preview dialog's content and choices.
 /// Each fix has its own tick box; fixes that are in use right now start unticked. A warning's
 /// offered fix (e.g. "mark this network Private first") is listed once and starts unticked.
 /// </summary>

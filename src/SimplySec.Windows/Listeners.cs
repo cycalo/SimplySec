@@ -8,8 +8,8 @@ using SimplySec.Windows.Interop;
 namespace SimplySec.Windows;
 
 /// <summary>
-/// Listening sockets with their exact program, services, user and AppContainer (port of
-/// windows/listeners.py; psutil's tables are read directly with GetExtendedTcpTable/UdpTable).
+/// Listening sockets with their exact program, services, user and AppContainer,
+/// read directly with GetExtendedTcpTable/UdpTable (the same results psutil gave v2).
 /// </summary>
 public static class Listeners
 {

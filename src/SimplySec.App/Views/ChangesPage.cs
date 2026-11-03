@@ -16,8 +16,8 @@ public sealed record ChangeRowView(bool IsBatch, long Id, string Change, string 
 }
 
 /// <summary>
-/// Every change SimplySec made, grouped by batch, with Undo, Undo all and the firewall backups
-/// (port of pages/changes.py). A flat list with batch rows replaces v2's tree, so several batches
+/// Every change SimplySec made, grouped by batch, with Undo, Undo all and the firewall backups.
+/// A flat list with batch rows replaces v2's tree, so several batches
 /// and changes can be selected and undone together.
 /// </summary>
 public sealed class ChangesPage : PageView

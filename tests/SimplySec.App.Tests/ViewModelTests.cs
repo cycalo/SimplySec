@@ -10,7 +10,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.App.Tests;
 
-/// <summary>The main view model on fakes (port of ui/controller.py's behaviour and test_gui_smoke).</summary>
+/// <summary>The main view model on fakes.</summary>
 public sealed class ViewModelTests : IDisposable
 {
     private const string RaPath = @"HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance";

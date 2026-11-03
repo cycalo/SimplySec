@@ -12,8 +12,7 @@ using SimplySec.Core.Storage;
 namespace SimplySec.App.ViewModels;
 
 /// <summary>
-/// Glue between the pages and the engine: scans, the fix flow, Keep and undo (port of
-/// ui/controller.py).
+/// Glue between the pages and the engine: scans, the fix flow, Keep and undo.
 ///
 /// As administrator, fixes and undo run in-process on a background thread. Otherwise the
 /// confirmed selection is handed to one elevated <c>fix</c>/<c>undo</c> call (Windows shows a

@@ -30,7 +30,7 @@ public abstract class DrawnControl : FrameworkElement
             size, brush, VisualTreeHelper.GetDpi(this).PixelsPerDip);
 }
 
-/// <summary>Score ring with the grade in the middle (port of widgets/score_ring.py).</summary>
+/// <summary>Score ring with the grade in the middle.</summary>
 public sealed class ScoreRing : DrawnControl
 {
     public int? Score { get; private set; }
@@ -89,7 +89,7 @@ public sealed class ScoreRing : DrawnControl
     }
 }
 
-/// <summary>Risk-score-over-time line chart (port of widgets/trend_chart.py).</summary>
+/// <summary>Risk-score-over-time line chart.</summary>
 public sealed class TrendChart : DrawnControl
 {
     public List<(string Label, int Score)> Points { get; private set; } = [];

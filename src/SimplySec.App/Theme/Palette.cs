@@ -6,7 +6,7 @@ using Wpf.Ui.Appearance;
 namespace SimplySec.App.Theme;
 
 /// <summary>
-/// Severity, grade and impact colours (Windows 11 palette, as v2's theme.py). Chips keep white
+/// Severity, grade and impact colours (Windows 11 palette). Chips keep white
 /// text on the saturated colour in both themes; colours used as text get a lighter dark-mode
 /// variant, so nothing hard-coded is unreadable on a dark background.
 /// </summary>

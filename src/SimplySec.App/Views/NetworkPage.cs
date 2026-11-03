@@ -53,7 +53,7 @@ public sealed class DeviceRow(MainViewModel vm, string mac, bool trusted) : INot
     private void Changed([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>Devices, the router (UPnP port forwards) and this PC's saved Wi-Fi networks (port of pages/network.py).</summary>
+/// <summary>Devices, the router (UPnP port forwards) and this PC's saved Wi-Fi networks.</summary>
 public sealed class NetworkPage : PageView
 {
     private readonly Wpf.Ui.Controls.Button _scan;

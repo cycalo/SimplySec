@@ -9,9 +9,9 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Single source of truth during the port: the Python v2 knowledge base and resources. -->
-    <EmbeddedResource Include="..\simplysec\core\knowledge\*.toml" LogicalName="knowledge/%(Filename)%(Extension)" />
-    <EmbeddedResource Include="..\simplysec\resources\oui.csv.gz" LogicalName="resources/oui.csv.gz" />
+    <!-- The knowledge base (ports, programs, services) and the IEEE OUI vendor list. -->
+    <EmbeddedResource Include="Resources\knowledge\*.toml" LogicalName="knowledge/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Resources\oui.csv.gz" LogicalName="resources/oui.csv.gz" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SimplySec.Core.Tests" />

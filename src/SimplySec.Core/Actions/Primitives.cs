@@ -123,7 +123,7 @@ public sealed class Primitive
     public Func<JsonObject, JsonObject, bool> BeforeOk { get; init; } = (_, _) => true;
 }
 
-/// <summary>Every change SimplySec makes is one of these primitives (port of core/actions.py).</summary>
+/// <summary>Every change SimplySec makes is one of these primitives.</summary>
 public static class Primitives
 {
     /// <summary>Services SimplySec may ever change; nothing on the never-touch list (tested).</summary>

@@ -157,18 +157,6 @@ public static class Collector
         return env;
     }
 
-    /// <summary>
-    /// The facts, read natively. SIMPLYSEC_FACTS=ps1 runs v2's facts.ps1 instead (kept for
-    /// comparisons until the cutover; the native reader is checked against it by a test).
-    /// </summary>
-    private static JsonObject Facts()
-    {
-        if (Environment.GetEnvironmentVariable("SIMPLYSEC_FACTS") == "ps1")
-        {
-            return Runner.PowerShellFile(Paths.FactsScript, timeout: 180) as JsonObject ?? [];
-        }
-        return NativeFacts.Collect();
-    }
 
     public static RawScan Collect(Action<string>? progress = null)
     {
@@ -178,7 +166,7 @@ public static class Collector
         void Say(string text) => progress?.Invoke(text);
 
         Say("Reading listening programs, firewall rules and Windows security settings…");
-        var tFacts = Task.Run(Facts);
+        var tFacts = Task.Run(NativeFacts.Collect);
         var tListeners = Task.Run(Listeners.ReadListeners);
         var tFirewall = Task.Run(() => Firewall.ReadState());
 

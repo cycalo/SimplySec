@@ -32,7 +32,7 @@ public sealed class CliHost
 }
 
 /// <summary>
-/// The command-line interface (port of cli.py): same subcommands, flags, texts and exit codes.
+/// The command-line interface: same subcommands, flags, texts and exit codes.
 /// </summary>
 public sealed class Cli(CliHost host)
 {

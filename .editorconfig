@@ -8,7 +8,7 @@ insert_final_newline = true
 [*.cs]
 indent_style = space
 indent_size = 4
-# Parity with Python v2 depends on culture-free, ordinal string handling.
+# Results must not depend on the PC's language: culture-free, ordinal string handling.
 dotnet_diagnostic.CA1304.severity = error
 dotnet_diagnostic.CA1305.severity = error
 dotnet_diagnostic.CA1309.severity = error

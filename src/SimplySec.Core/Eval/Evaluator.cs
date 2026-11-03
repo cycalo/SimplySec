@@ -61,7 +61,7 @@ public sealed class CompiledRule
 
 /// <summary>
 /// Who can reach a listening port? A pure model of Windows Firewall inbound filtering.
-/// Port of <c>core/exposure.py</c>; behaviour and wording must stay identical.
+/// Behaviour and wording are pinned by the golden exposure cases.
 /// </summary>
 public static partial class Evaluator
 {

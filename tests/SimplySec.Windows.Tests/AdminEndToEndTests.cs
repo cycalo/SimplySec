@@ -7,7 +7,7 @@ using SimplySec.Core.Model;
 namespace SimplySec.Windows.Tests;
 
 /// <summary>
-/// Port of tests/integration/test_admin_e2e.py. These change this PC and undo it, so they are
+/// These change this PC and undo it, so they are
 /// opt-in: run from an elevated prompt with SIMPLYSEC_ADMIN_TESTS=1, e.g.
 ///   $env:SIMPLYSEC_ADMIN_TESTS=1; dotnet test --project tests/SimplySec.Windows.Tests -- --filter-trait "Category=Admin"
 /// </summary>

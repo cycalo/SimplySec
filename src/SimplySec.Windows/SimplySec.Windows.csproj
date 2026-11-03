@@ -16,11 +16,6 @@
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Only for SIMPLYSEC_FACTS=ps1 and the facts test; not shipped (scans no longer run PowerShell). -->
-    <None Include="..\simplysec\windows\scripts\facts.ps1" Link="scripts\facts.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
-  </ItemGroup>
-  <ItemGroup>
     <InternalsVisibleTo Include="SimplySec.Windows.Tests" />
-    <InternalsVisibleTo Include="SimplySec.Spikes" />
   </ItemGroup>
 </Project>

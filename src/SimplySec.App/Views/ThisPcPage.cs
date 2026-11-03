@@ -7,7 +7,7 @@ using static SimplySec.App.Theme.Ui;
 
 namespace SimplySec.App.Views;
 
-/// <summary>Every finding as a card, most serious first, topic shown on each card (port of pages/this_pc.py).</summary>
+/// <summary>Every finding as a card, most serious first, topic shown on each card.</summary>
 public sealed class ThisPcPage : PageView
 {
     private static readonly string[] AreaOrder =

@@ -119,29 +119,6 @@ public sealed class SystemSetters : ISystemAdapter
 /// <summary>What is in use right now: evidence for "what would this fix affect?" (the usage fact).</summary>
 public static partial class Usage
 {
-    /// <summary>What v2 ran in PowerShell; kept only so tests can compare <see cref="Extra"/> with it.</summary>
-    internal const string ReferenceScript = """
-        $out = [ordered]@{}
-        try {
-          $out.mappings = @(Get-SmbMapping -ErrorAction Stop | ForEach-Object {
-            [ordered]@{ local = $_.LocalPath; remote = $_.RemotePath; status = [string]$_.Status } })
-        } catch { $out.mappings = @() }
-        try {
-          $out.printers = @(Get-Printer -ErrorAction Stop | Where-Object { $_.Type -eq 1 -or $_.PortName -like '\\*' -or $_.PortName -like 'WSD*' -or $_.PortName -like 'IP_*' } |
-            ForEach-Object { [ordered]@{ name = $_.Name; port = $_.PortName; computer = $_.ComputerName } })
-        } catch { $out.printers = @() }
-        try {
-          $out.smb_sessions = @(Get-SmbSession -ErrorAction Stop | ForEach-Object {
-            [ordered]@{ client = $_.ClientComputerName; user = $_.ClientUserName; dialect = [string]$_.Dialect } })
-          $out.smb_sessions_status = 'ok'
-        } catch { $out.smb_sessions = @(); $out.smb_sessions_status = 'needs_admin' }
-        try {
-          $out.last_logons = @(Get-LocalUser | ForEach-Object {
-            [ordered]@{ sid = $_.SID.Value; last = if ($_.LastLogon) { $_.LastLogon.ToUniversalTime().ToString('o') } else { $null } } })
-        } catch { $out.last_logons = @() }
-        $out | ConvertTo-Json -Depth 5 -Compress
-        """;
-
     public static JsonArray InboundConnections(List<Listener> listeners)
     {
         var listening = listeners.Where(x => x.Protocol == "tcp").Select(x => (x.Port, x.Pid)).ToHashSet();

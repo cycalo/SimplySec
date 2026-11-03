@@ -31,7 +31,6 @@ public static class Paths
     public static string HistoryPath => Path.Combine(UserDir, "history.db");
     public static string BackupsDir => Path.Combine(DataDir, "backups");
     public static string LogDir => Path.Combine(UserDir, "logs");
-    public static string FactsScript => Path.Combine(AppContext.BaseDirectory, "scripts", "facts.ps1");
 
     /// <summary>Only SYSTEM and Administrators may change the journal; Users may read it.</summary>
     public const string DataDirSddl = "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)";

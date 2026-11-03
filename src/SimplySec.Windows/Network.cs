@@ -8,7 +8,7 @@ using SimplySec.Core.Model;
 namespace SimplySec.Windows;
 
 /// <summary>
-/// Network adapters, addresses and firewall profiles (port of windows/network.py). Addresses come
+/// Network adapters, addresses and firewall profiles. Addresses come
 /// from GetAdaptersAddresses (what psutil reads); type, profile, gateways and DNS from facts.
 /// </summary>
 public sealed partial class Network : INetworkAdapter

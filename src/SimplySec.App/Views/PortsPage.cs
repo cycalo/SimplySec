@@ -45,7 +45,7 @@ public sealed class PortRowView(PortRow r)
     public bool Reachable => Row.Verdict is Verdict.Reachable or Verdict.Uncertain;
 }
 
-/// <summary>Port, program, listening on, reachable from, in use, risk, action (port of pages/ports.py).</summary>
+/// <summary>Port, program, listening on, reachable from, in use, risk, action.</summary>
 public sealed class PortsPage : PageView
 {
     public const int ActionColumn = 6;

@@ -154,7 +154,7 @@ public class AnalyzeGoldenTests
     }
 }
 
-/// <summary>The same pinned clock, rule id and file_exists as tools/parity/export_golden.py.</summary>
+/// <summary>The pinned clock, rule id and file_exists the golden data was exported with.</summary>
 public static class Pinned
 {
     public static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

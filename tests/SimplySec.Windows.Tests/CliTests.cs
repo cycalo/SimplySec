@@ -6,7 +6,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Windows.Tests;
 
-/// <summary>Port of tests/unit/test_cli.py: CLI output shape on the real-data fixture, no OS access.</summary>
+/// <summary>CLI output shape on the real-data fixture, no OS access.</summary>
 public sealed class CliTests : IDisposable
 {
     private readonly TempDir _tmp = new();

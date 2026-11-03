@@ -12,7 +12,7 @@ using static SimplySec.App.Theme.Ui;
 
 namespace SimplySec.App.Views;
 
-/// <summary>Navigation on the left, progress and pages on the right, status at the bottom (port of main_window.py).</summary>
+/// <summary>Navigation on the left, progress and pages on the right, status at the bottom.</summary>
 public sealed class MainWindow : FluentWindow
 {
     private sealed class PageProvider(Dictionary<Type, PageView> pages) : INavigationViewPageProvider

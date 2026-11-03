@@ -17,15 +17,12 @@ public sealed record RunResult(IReadOnlyList<string> Args, int Code, string Stdo
 
 /// <summary>
 /// Run external programs safely: no shell, no console window, timeouts, real exit codes.
-/// PowerShell is only used to return objects as JSON; parameters travel as base64 JSON in an
-/// environment variable, so nothing is spliced into script text.
 /// </summary>
 public static class Runner
 {
     public static readonly string System32 = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "System32");
-    public static readonly string PowerShellExe = Path.Combine(System32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
-    /// <summary>Raised with the file name of every program started (tests check no powershell.exe runs).</summary>
+    /// <summary>Raised with the file name of every program started (a test checks a scan starts no PowerShell).</summary>
     public static event Action<string>? Started;
 
     /// <summary>Run a program. In <paramref name="env"/>, a null value removes that variable.</summary>
@@ -105,89 +102,4 @@ public static class Runner
     }
 
     private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n];
-
-    private const string Prelude = """
-
-        $ErrorActionPreference = 'Stop'
-        $ProgressPreference = 'SilentlyContinue'
-        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-        $P = $null
-        if ($env:SIMPLYSEC_PARAMS) {
-          $P = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:SIMPLYSEC_PARAMS)) | ConvertFrom-Json
-        }
-
-        """;
-
-    private static string[] PsArgs(params string[] tail) =>
-        [PowerShellExe, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", .. tail];
-
-    /// <summary>
-    /// Environment for Windows PowerShell. PSModulePath is dropped so 5.1 rebuilds its own: when
-    /// SimplySec is started from PowerShell 7 it inherits 7's module folders, and 5.1 then fails
-    /// to load built-in modules (Get-AuthenticodeSignature, NetSecurity, ...).
-    /// </summary>
-    private static Dictionary<string, string?> PsEnv() => new(StringComparer.OrdinalIgnoreCase) { ["PSModulePath"] = null };
-
-    /// <summary>Run an inline PowerShell script; <c>$P</c> holds the parameters (decoded from JSON).</summary>
-    public static RunResult PowerShell(string script, JsonNode? parameters = null, double timeout = 90)
-    {
-        var env = PsEnv();
-        if (parameters is not null)
-        {
-            env["SIMPLYSEC_PARAMS"] = Convert.ToBase64String(Encoding.UTF8.GetBytes(parameters.ToJsonString()));
-        }
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(Prelude + script));
-        try
-        {
-            var r = Run(PsArgs("-EncodedCommand", encoded), timeout, env: env);
-            return r with { Args = ["powershell", "<script>"] };
-        }
-        catch (CommandException exc) when (exc.Message.Contains("timed out", StringComparison.Ordinal))
-        {
-            throw new CommandException($"PowerShell timed out after {timeout:0}s");
-        }
-    }
-
-    /// <summary>Run PowerShell that writes one JSON document; failures raise, never pass silently.</summary>
-    public static JsonNode? PowerShellJson(string script, JsonNode? parameters = null, double timeout = 90)
-    {
-        var res = PowerShell(script, parameters, timeout);
-        if (!res.Ok)
-        {
-            throw new CommandException($"PowerShell failed (exit {res.Code}): {Truncate(res.Stderr.Trim(), 600)}", res);
-        }
-        var text = res.Stdout.Trim();
-        if (text.Length == 0)
-        {
-            return null;
-        }
-        try
-        {
-            return JsonNode.Parse(text);
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            throw new CommandException($"PowerShell returned invalid JSON: {Truncate(text, 200)}", res);
-        }
-    }
-
-    /// <summary>Run a bundled .ps1 that prints JSON.</summary>
-    public static JsonNode? PowerShellFile(string path, double timeout = 120)
-    {
-        var res = Run(PsArgs("-File", path), timeout, env: PsEnv());
-        var name = Path.GetFileName(path);
-        if (!res.Ok)
-        {
-            throw new CommandException($"{name} failed (exit {res.Code}): {Truncate(res.Stderr.Trim(), 600)}", res);
-        }
-        try
-        {
-            var text = res.Stdout.Trim();
-            return JsonNode.Parse(text.Length > 0 ? text : "null");
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            throw new CommandException($"{name} returned invalid JSON: {Truncate(res.Stdout, 200)}", res);
-        }
-    }
 }

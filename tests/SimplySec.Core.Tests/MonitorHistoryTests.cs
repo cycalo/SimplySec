@@ -10,7 +10,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Core.Tests;
 
-/// <summary>Ports of test_monitor.py and the history/scoring parts of test_core_small.py.</summary>
+/// <summary>Daily check, history and scoring.</summary>
 public class MonitorHistoryTests
 {
     static MonitorHistoryTests() => Pinned.Apply();

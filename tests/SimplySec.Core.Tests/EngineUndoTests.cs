@@ -8,7 +8,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Core.Tests;
 
-/// <summary>Apply, verify and undo with fake OS adapters (port of test_engine_undo.py).</summary>
+/// <summary>Apply, verify and undo with fake OS adapters.</summary>
 public class EngineUndoTests
 {
     private const string Ra = @"HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance";

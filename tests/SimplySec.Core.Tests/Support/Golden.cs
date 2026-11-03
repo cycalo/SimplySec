@@ -6,7 +6,7 @@ using SimplySec.Core.Compat;
 
 namespace SimplySec.Core.Tests.Support;
 
-/// <summary>Loads golden data exported from Python v2 (tools/parity/export_golden.py).</summary>
+/// <summary>Loads golden data exported from Python v2 (frozen: the regression corpus for analysis, plans and storage).</summary>
 public static class Golden
 {
     public static readonly string RepoRoot = FindRoot();

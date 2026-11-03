@@ -11,7 +11,7 @@ using static SimplySec.App.Theme.Ui;
 
 namespace SimplySec.App.Views;
 
-/// <summary>Score ring, Scan &amp; Protect, counts, top fixes, network status, what changed (port of pages/overview.py).</summary>
+/// <summary>Score ring, Scan &amp; Protect, counts, top fixes, network status, what changed.</summary>
 public sealed class OverviewPage : PageView
 {
     public ScoreRing Ring { get; } = new();

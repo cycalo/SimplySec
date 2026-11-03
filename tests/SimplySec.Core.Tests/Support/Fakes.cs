@@ -7,7 +7,7 @@ using SimplySec.Core.Storage;
 
 namespace SimplySec.Core.Tests.Support;
 
-// Fakes with the same method sets as the Python v2 test fakes (test_engine_undo.py, test_monitor.py).
+// Fakes with the same method sets as the Python v2 test fakes.
 
 public sealed class FakeFirewall : IFirewallAdapter
 {

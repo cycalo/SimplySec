@@ -12,7 +12,7 @@
     <AssemblyName>SimplySec</AssemblyName>
     <RootNamespace>SimplySec.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\simplysec\resources\simplysec.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\simplysec.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <Description>SimplySec</Description>
@@ -25,7 +25,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="..\simplysec\resources\simplysec.ico" Link="simplysec.ico" />
+    <Resource Include="Resources\simplysec.ico" Link="simplysec.ico" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SimplySec.App.Tests" />

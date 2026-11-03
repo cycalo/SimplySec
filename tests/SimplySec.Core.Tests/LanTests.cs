@@ -12,7 +12,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Core.Tests;
 
-/// <summary>Home network, router and report (port of test_lan.py and test_report.py; no network access).</summary>
+/// <summary>Home network, router and report.</summary>
 public class LanTests
 {
     static LanTests() => Pinned.Apply();

@@ -4,7 +4,6 @@ using SimplySec.Windows.Interop;
 namespace SimplySec.Windows.Tests;
 
 /// <summary>Native interop on this PC (read-only): struct layouts and psutil-equivalent behaviour.</summary>
-[Collection("os")]
 public class NativeTests
 {
     [Theory]
@@ -58,21 +57,6 @@ public class NativeTests
     }
 
     [Fact]
-    public void WindowsPowerShellLoadsItsOwnModules()
-    {
-        // Fails when PowerShell 7's PSModulePath leaks into powershell.exe (e.g. run from pwsh).
-        var status = Runner.PowerShellJson("ConvertTo-Json ([string](Get-AuthenticodeSignature -LiteralPath \"$env:SystemRoot\\explorer.exe\").Status)");
-        Assert.Equal("Valid", status!.GetValue<string>());
-    }
-
-    [Fact]
     public void SignatureOfMissingFileIsUnreadable() =>
         Assert.Equal("Unreadable", WinTrust.Verify(@"C:\definitely\missing\nothing.exe").Status);
-
-    [Fact]
-    public void ParametersTravelAsJson()
-    {
-        var echoed = Runner.PowerShellJson("ConvertTo-Json -Compress $P.text", new JsonObject { ["text"] = "a'b\"c$(x)" });
-        Assert.Equal("a'b\"c$(x)", echoed!.GetValue<string>());
-    }
 }

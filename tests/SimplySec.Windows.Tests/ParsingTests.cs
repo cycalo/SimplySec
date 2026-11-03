@@ -3,7 +3,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Windows.Tests;
 
-/// <summary>Wi-Fi profile and nmap XML parsing (the OS-layer parts of tests/unit/test_lan.py).</summary>
+/// <summary>Wi-Fi profile and nmap XML parsing.</summary>
 public class ParsingTests
 {
     private const string Profile = """

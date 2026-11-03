@@ -10,8 +10,8 @@ using static SimplySec.App.Theme.Ui;
 namespace SimplySec.App.Controls;
 
 /// <summary>
-/// What SimplySec is doing right now: steps done, current step, elapsed time (port of
-/// widgets/progress_panel.py). Shown above every page while a scan, fix or undo runs.
+/// What SimplySec is doing right now: steps done, current step, elapsed time.
+/// Shown above every page while a scan, fix or undo runs.
 /// </summary>
 public sealed class ProgressPanel : UserControl
 {

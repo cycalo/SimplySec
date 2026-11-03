@@ -7,7 +7,7 @@ using SimplySec.Core.Tests.Support;
 
 namespace SimplySec.Core.Tests;
 
-/// <summary>Real cases from this PC (fixture captured read-only on 2026-11-02), ported from test_this_pc.py.</summary>
+/// <summary>Real cases from this PC (fixture captured read-only on 2026-11-02).</summary>
 public class ThisPcTests
 {
     private const string Ollama = @"C:\Users\micha\AppData\Local\Programs\Ollama\ollama.exe";

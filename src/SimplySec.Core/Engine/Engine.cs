@@ -51,7 +51,7 @@ public sealed class EngineOptions
     public string UserName { get; init; } = Environment.UserName;
 }
 
-/// <summary>Scan, preview, apply, verify and undo (port of core/engine.py's Engine).</summary>
+/// <summary>Scan, preview, apply, verify and undo.</summary>
 public sealed class ScanEngine(EngineOptions options)
 {
     private Adapters? _adapters;

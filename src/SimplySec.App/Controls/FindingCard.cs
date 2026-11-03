@@ -10,7 +10,7 @@ namespace SimplySec.App.Controls;
 
 /// <summary>
 /// A finding as a card: plain title, what it means, what uses it, advice and technical details,
-/// with Fix / Keep / Show more (port of widgets/finding_card.py). <c>compact</c> (Overview) keeps
+/// with Fix / Keep / Show more. <c>compact</c> (Overview) keeps
 /// everything but the title, meaning and buttons behind "Show more".
 /// </summary>
 public sealed class FindingCard : UserControl

@@ -11,7 +11,4 @@
     <Project Path="tests/SimplySec.Core.Tests/SimplySec.Core.Tests.csproj" />
     <Project Path="tests/SimplySec.Windows.Tests/SimplySec.Windows.Tests.csproj" />
   </Folder>
-  <Folder Name="/tools/">
-    <Project Path="tools/spikes/SimplySec.Spikes.csproj" />
-  </Folder>
 </Solution>

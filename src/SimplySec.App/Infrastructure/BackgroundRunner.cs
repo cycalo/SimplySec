@@ -3,8 +3,8 @@ using Serilog;
 namespace SimplySec.App.Infrastructure;
 
 /// <summary>
-/// Runs slow work (scans, fixes, undo) on the thread pool so the window never freezes (port of
-/// ui/workers.py). Every task ends with exactly one callback, result or error, delivered on the
+/// Runs slow work (scans, fixes, undo) on the thread pool so the window never freezes.
+/// Every task ends with exactly one callback, result or error, delivered on the
 /// UI thread. "Finished" runs from that same delivery, before the result handler, so the busy
 /// state always clears, and clears before any result dialog opens.
 /// </summary>

@@ -13,7 +13,7 @@ namespace SimplySec.App.Views;
 
 public sealed record ScanRowView(long Id, string Scan, string Type, string Score, string Change);
 
-/// <summary>Score trend, past scans with new and resolved findings, and the HTML report (port of pages/history.py).</summary>
+/// <summary>Score trend, past scans with new and resolved findings, and the HTML report.</summary>
 public sealed class HistoryPage : PageView
 {
     public TrendChart Chart { get; } = new();

@@ -11,7 +11,7 @@ using static SimplySec.App.Theme.Ui;
 
 namespace SimplySec.App.Views;
 
-/// <summary>Administrator status, daily check, owned networks, accepted risks, data folders (port of pages/settings.py).</summary>
+/// <summary>Administrator status, daily check, owned networks, accepted risks, data folders.</summary>
 public sealed class SettingsPage : PageView
 {
     private readonly TextBlock _adminText = Text();
