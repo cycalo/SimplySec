@@ -192,6 +192,22 @@ def live_listeners() -> set[LKey]:
 # --------------------------------------------------------------------------- step 1: raw
 
 
+def _normalize_facts(facts: dict[str, Any]) -> dict[str, Any]:
+    """Documented P6 deviations of the native facts (both have no effect on the analysis):
+    network.ip keeps the IP-interface order, not Get-NetIPConfiguration's (it is only ever
+    looked up by interface index); last logons have whole seconds (netapi32), not ticks."""
+    facts = json.loads(json.dumps(facts))
+    net = facts.get("network", {}).get("value")
+    if isinstance(net, dict) and isinstance(net.get("ip"), list):
+        net["ip"] = sorted(net["ip"], key=lambda x: x.get("index", 0))
+    usage = facts.get("usage", {}).get("value")
+    if isinstance(usage, dict):
+        for row in usage.get("last_logons") or []:
+            if isinstance(row, dict) and isinstance(row.get("last"), str):
+                row["last"] = row["last"][:19]
+    return facts
+
+
 def compare_raw(py: dict[str, Any], cs: dict[str, Any], stable: set[LKey]) -> Outcome:
     o = Outcome()
     listener_drift = False
@@ -240,7 +256,7 @@ def compare_raw(py: dict[str, Any], cs: dict[str, Any], stable: set[LKey]) -> Ou
     keys = ("is_admin", "windows_dir", "errors")
     o.add("top", deep_diff({k: py.get(k) for k in keys}, {k: cs.get(k) for k in keys}, ""), False)
 
-    pfacts, cfacts = py.get("facts", {}), cs.get("facts", {})
+    pfacts, cfacts = _normalize_facts(py.get("facts", {})), _normalize_facts(cs.get("facts", {}))
     for name in sorted(set(pfacts) | set(cfacts)):
         if name in IGNORED_FACTS:
             continue

@@ -242,24 +242,35 @@ public sealed partial class Network : INetworkAdapter
         return output.OrderBy(i => i.Kind == InterfaceKind.Loopback).ThenBy(i => !i.Up).ThenBy(i => i.Alias, StringComparer.Ordinal).ToList();
     }
 
+    private static List<System.Management.ManagementObject> ConnectionProfiles(int index) =>
+        Wmi.Query(Wmi.StandardCimv2, $"SELECT * FROM MSFT_NetConnectionProfile WHERE InterfaceIndex = {index.ToString(System.Globalization.CultureInfo.InvariantCulture)}")
+            .OfType<System.Management.ManagementObject>().ToList();
+
+    /// <summary>Set-NetConnectionProfile -NetworkCategory (MSFT_NetConnectionProfile, modified in place).</summary>
     public void SetCategory(int index, Profile profile)
     {
-        var category = profile switch
+        uint category = profile switch
         {
-            Profile.Public => "Public",
-            Profile.Private => "Private",
+            Profile.Public => 0,
+            Profile.Private => 1,
             _ => throw new ArgumentException("only Public or Private can be set"),
         };
-        Runner.PowerShellJson("Set-NetConnectionProfile -InterfaceIndex ([int]$P.index) -NetworkCategory $P.category; 'null'",
-            new JsonObject { ["index"] = index, ["category"] = category });
+        var profiles = ConnectionProfiles(index);
+        if (profiles.Count == 0)
+        {
+            throw new CommandException($"no network profile on interface {index}");
+        }
+        foreach (var p in profiles)
+        {
+            p["NetworkCategory"] = category;
+            p.Put();
+        }
     }
 
     public Profile? GetCategory(int index)
     {
-        var data = Runner.PowerShellJson(
-            "$p = Get-NetConnectionProfile -InterfaceIndex ([int]$P.index) -ErrorAction SilentlyContinue; if ($p) { [int]$p.NetworkCategory } else { 'null' }",
-            new JsonObject { ["index"] = index });
-        return data is not null && !Js.IsNull(data) && CategoryToProfile.TryGetValue(Js.Long(data), out var p) ? p : null;
+        var p = ConnectionProfiles(index).FirstOrDefault();
+        return p is not null && CategoryToProfile.TryGetValue(Wmi.Long(p, "NetworkCategory"), out var profile) ? profile : null;
     }
 
     // ------------------------------------------------------------------ neighbours (GetIpNetTable2)

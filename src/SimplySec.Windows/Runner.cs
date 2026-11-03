@@ -25,6 +25,9 @@ public static class Runner
     public static readonly string System32 = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "System32");
     public static readonly string PowerShellExe = Path.Combine(System32, "WindowsPowerShell", "v1.0", "powershell.exe");
 
+    /// <summary>Raised with the file name of every program started (tests check no powershell.exe runs).</summary>
+    public static event Action<string>? Started;
+
     /// <summary>Run a program. In <paramref name="env"/>, a null value removes that variable.</summary>
     public static RunResult Run(IReadOnlyList<string> args, double timeout = 60, bool check = false, string? input = null,
         IDictionary<string, string?>? env = null)
@@ -55,6 +58,8 @@ public static class Runner
             }
         }
         var name = Path.GetFileName(args[0]);
+        Log.Debug("running {Name}", name);
+        Started?.Invoke(name);
         Process proc;
         try
         {

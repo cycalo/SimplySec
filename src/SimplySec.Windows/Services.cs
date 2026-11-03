@@ -16,52 +16,83 @@ using SimplySec.Windows.Interop;
 
 namespace SimplySec.Windows;
 
-/// <summary>Setters that still use PowerShell (P6 replaces them with CIM): SMB, Defender, NetBIOS, restore points.</summary>
+/// <summary>System settings through CIM methods (the providers behind the SMB, Defender and restore cmdlets).</summary>
 public sealed class SystemSetters : ISystemAdapter
 {
+    private static void Check(System.Management.ManagementBaseObject? result, string what, params uint[] ok)
+    {
+        var rc = result?["ReturnValue"] is { } v ? Convert.ToUInt32(v, CultureInfo.InvariantCulture) : 0u;
+        if (!(ok.Length == 0 ? rc == 0 : ok.Contains(rc)))
+        {
+            throw new CommandException($"{what} returned {rc}");
+        }
+    }
+
     public JsonObject SmbServerGet() =>
-        Runner.PowerShellJson("$c = Get-SmbServerConfiguration; [ordered]@{ smb1 = [bool]$c.EnableSMB1Protocol } | ConvertTo-Json -Compress") as JsonObject
-        ?? throw new CommandException("Get-SmbServerConfiguration returned nothing");
+        new() { ["smb1"] = Wmi.Bool(NativeFacts.SmbServerConfiguration(), "EnableSMB1Protocol") };
 
     public void SmbServerSet(bool smb1) =>
-        Runner.PowerShellJson("Set-SmbServerConfiguration -EnableSMB1Protocol ([bool]$P.smb1) -Force -Confirm:$false; 'null'", new JsonObject { ["smb1"] = smb1 });
+        Check(Wmi.ClassMethod(Wmi.Smb, "MSFT_SmbServerConfiguration", "SetConfiguration", new Dictionary<string, object> { ["EnableSMB1Protocol"] = smb1 }),
+            "Set-SmbServerConfiguration");
 
-    public JsonObject DefenderGet() =>
-        Runner.PowerShellJson("$p = Get-MpPreference; [ordered]@{ controlled_folder_access = [int]$p.EnableControlledFolderAccess } | ConvertTo-Json -Compress") as JsonObject
-        ?? throw new CommandException("Get-MpPreference returned nothing");
+    public JsonObject DefenderGet()
+    {
+        var p = Wmi.First(Wmi.Defender, "SELECT EnableControlledFolderAccess FROM MSFT_MpPreference") ?? throw new CommandException("Get-MpPreference returned nothing");
+        return new JsonObject { ["controlled_folder_access"] = (int)Wmi.Long(p, "EnableControlledFolderAccess") };
+    }
 
     public void DefenderSetCfa(int mode) =>
-        Runner.PowerShellJson("Set-MpPreference -EnableControlledFolderAccess ([int]$P.mode); 'null'", new JsonObject { ["mode"] = mode });
+        Check(Wmi.ClassMethod(Wmi.Defender, "MSFT_MpPreference", "Set", new Dictionary<string, object> { ["EnableControlledFolderAccess"] = (byte)mode }),
+            "Set-MpPreference");
 
-    public void UpdateSignatures() => Runner.PowerShellJson("Update-MpSignature; 'null'", timeout: 600);
+    public void UpdateSignatures() =>
+        Check(Wmi.ClassMethod(Wmi.Defender, "MSFT_MpSignature", "Update", new Dictionary<string, object>()), "Update-MpSignature");
 
-    public int NetbiosGet(int configIndex)
-    {
-        var data = Runner.PowerShellJson(
-            "$a = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter (\"Index={0}\" -f [int]$P.index); if ($a) { [int]$a.TcpipNetbiosOptions } else { 'null' }",
-            new JsonObject { ["index"] = configIndex });
-        if (Js.IsNull(data))
-        {
-            throw new CommandException($"network adapter configuration {configIndex} not found");
-        }
-        return Js.Int(data);
-    }
+    private static System.Management.ManagementObject AdapterConfig(int configIndex) =>
+        Wmi.Query(Wmi.Cimv2, $"SELECT * FROM Win32_NetworkAdapterConfiguration WHERE Index = {configIndex.ToString(CultureInfo.InvariantCulture)}")
+            .OfType<System.Management.ManagementObject>().FirstOrDefault()
+        ?? throw new CommandException($"network adapter configuration {configIndex} not found");
 
-    /// <summary>0 = default (DHCP decides), 1 = enabled, 2 = disabled.</summary>
+    public int NetbiosGet(int configIndex) =>
+        AdapterConfig(configIndex)["TcpipNetbiosOptions"] is { } v ? Convert.ToInt32(v, CultureInfo.InvariantCulture)
+        : throw new CommandException($"network adapter configuration {configIndex} has no NetBIOS setting");
+
+    /// <summary>
+    /// 0 = default (DHCP decides), 1 = enabled, 2 = disabled. Windows refuses 0 on an adapter
+    /// without DHCP (return value 100), so undoing "NetBIOS off" there failed in v2; the stored
+    /// setting the method would have written (NetBT's NetbiosOptions) is set directly instead.
+    /// </summary>
     public void NetbiosSet(int configIndex, int option)
     {
-        var data = Runner.PowerShellJson(
-            "$a = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter (\"Index={0}\" -f [int]$P.index); $r = Invoke-CimMethod -InputObject $a -MethodName SetTcpipNetbios -Arguments @{ TcpipNetbiosOptions = [uint32]$P.option }; [int]$r.ReturnValue",
-            new JsonObject { ["index"] = configIndex, ["option"] = option });
-        if (Js.Int(data) is not (0 or 1))
+        var adapter = AdapterConfig(configIndex);
+        var result = Wmi.InstanceMethod(adapter, "SetTcpipNetbios", new Dictionary<string, object> { ["TcpipNetbiosOptions"] = (uint)option });
+        var rc = result?["ReturnValue"] is { } v ? Convert.ToUInt32(v, CultureInfo.InvariantCulture) : 0u;
+        if (rc == 100 && option == 0 && adapter["SettingID"] is string guid)
         {
-            throw new CommandException($"SetTcpipNetbios returned {Js.PyRepr(data)}");
+            using var key = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64)
+                .OpenSubKey($@"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces\Tcpip_{guid}", writable: true)
+                ?? throw new CommandException($"SetTcpipNetbios returned 100 and the NetBT settings of {guid} were not found");
+            key.SetValue("NetbiosOptions", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            Log.Information("NetBIOS default restored in the registry for {Guid} (no DHCP on this adapter)", guid);
+            return;
         }
+        Check(result, "SetTcpipNetbios", 0, 1);
     }
 
-    public void CreateRestorePoint(string description) =>
-        Runner.PowerShellJson("Checkpoint-Computer -Description $P.description -RestorePointType MODIFY_SETTINGS; 'null'",
-            new JsonObject { ["description"] = description.Length > 60 ? description[..60] : description }, timeout: 300);
+    /// <summary>
+    /// Checkpoint-Computer -RestorePointType MODIFY_SETTINGS (SystemRestore.CreateRestorePoint).
+    /// Windows makes at most one restore point a day and skips later requests without an error.
+    /// </summary>
+    public void CreateRestorePoint(string description)
+    {
+        Check(Wmi.ClassMethod(@"root\default", "SystemRestore", "CreateRestorePoint", new Dictionary<string, object>
+        {
+            ["Description"] = description.Length > 60 ? description[..60] : description,
+            ["RestorePointType"] = 12u, // MODIFY_SETTINGS
+            ["EventType"] = 100u, // BEGIN_SYSTEM_CHANGE
+        }), "Checkpoint-Computer");
+        Log.Information("restore point requested: {Description}", description);
+    }
 
     public static readonly IReadOnlyDictionary<string, string> SettingsUris = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -88,7 +119,8 @@ public sealed class SystemSetters : ISystemAdapter
 /// <summary>What is in use right now: evidence for "what would this fix affect?" (the usage fact).</summary>
 public static partial class Usage
 {
-    private const string Script = """
+    /// <summary>What v2 ran in PowerShell; kept only so tests can compare <see cref="Extra"/> with it.</summary>
+    internal const string ReferenceScript = """
         $out = [ordered]@{}
         try {
           $out.mappings = @(Get-SmbMapping -ErrorAction Stop | ForEach-Object {
@@ -209,21 +241,70 @@ public static partial class Usage
         value["rdp_sessions"] = RdpSessions();
         value["msra_running"] = Listeners.ProcessSnapshot().Values.Any(p => PyStr.Lower(p.Name) == "msra.exe");
         value["hostname"] = Dns.GetHostName();
+        foreach (var (k, v) in Extra())
+        {
+            value[k] = v?.DeepClone();
+        }
+        return new JsonObject { ["status"] = "ok", ["value"] = value };
+    }
+
+    // MSFT_SmbMapping.Status, written by name as [string]$_.Status did.
+    private static readonly string[] MappingStatus = ["OK", "Paused", "Disconnected", "NetworkError", "Connecting", "Reconnecting", "Unavailable"];
+
+    private static JsonArray Rows(Func<IEnumerable<JsonNode>> read, string what)
+    {
         try
         {
-            if (Runner.PowerShellJson(Script, timeout: 60) is JsonObject extra)
-            {
-                foreach (var (k, v) in extra)
-                {
-                    value[k] = v?.DeepClone();
-                }
-            }
+            return new JsonArray([.. read()]);
         }
         catch (Exception exc)
         {
-            Log.Warning("usage facts: {Error}", exc.Message);
+            Log.Information("usage {What}: {Error}", what, exc.Message);
+            return [];
         }
-        return new JsonObject { ["status"] = "ok", ["value"] = value };
+    }
+
+    /// <summary>Mapped drives, network printers, SMB sessions and last logons (v2's usage script, natively).</summary>
+    public static JsonObject Extra()
+    {
+        var output = new JsonObject
+        {
+            ["mappings"] = Rows(() => Wmi.Query(Wmi.Smb, "SELECT LocalPath, RemotePath, Status FROM MSFT_SmbMapping").Select(m =>
+            {
+                var status = Wmi.Long(m, "Status");
+                return (JsonNode)new JsonObject
+                {
+                    ["local"] = Wmi.Prop(m, "LocalPath"),
+                    ["remote"] = Wmi.Prop(m, "RemotePath"),
+                    ["status"] = status >= 0 && status < MappingStatus.Length ? MappingStatus[(int)status] : status.ToString(CultureInfo.InvariantCulture),
+                };
+            }), "mappings"),
+            ["printers"] = Rows(() => Wmi.Query(Wmi.StandardCimv2, "SELECT Name, PortName, ComputerName, Type FROM MSFT_Printer")
+                .Where(p =>
+                {
+                    var port = Wmi.Str(p, "PortName");
+                    return Wmi.Long(p, "Type") == 1 || port.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase)
+                           || port.StartsWith("WSD", StringComparison.OrdinalIgnoreCase) || port.StartsWith("IP_", StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(p => (JsonNode)new JsonObject { ["name"] = Wmi.Prop(p, "Name"), ["port"] = Wmi.Prop(p, "PortName"), ["computer"] = Wmi.Prop(p, "ComputerName") }), "printers"),
+        };
+        try
+        {
+            output["smb_sessions"] = new JsonArray([.. Wmi.Query(Wmi.Smb, "SELECT ClientComputerName, ClientUserName, Dialect FROM MSFT_SmbSession")
+                .Select(s => (JsonNode)new JsonObject { ["client"] = Wmi.Prop(s, "ClientComputerName"), ["user"] = Wmi.Prop(s, "ClientUserName"), ["dialect"] = Wmi.Str(s, "Dialect") })]);
+            output["smb_sessions_status"] = "ok";
+        }
+        catch (Exception)
+        {
+            output["smb_sessions"] = new JsonArray();
+            output["smb_sessions_status"] = "needs_admin";
+        }
+        output["last_logons"] = Rows(() => LocalUsers.List().Select(u => (JsonNode)new JsonObject
+        {
+            ["sid"] = u.Sid,
+            ["last"] = u.LastLogon is { } d ? d.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) : null,
+        }), "last logons");
+        return output;
     }
 }
 
@@ -532,20 +613,40 @@ public sealed partial class Scheduler : ISchedulerAdapter
     }
 }
 
-/// <summary>Windows toast notifications (PowerShell's WinRT bridge until P6 gives SimplySec its own identity).</summary>
+/// <summary>
+/// Windows toast notifications through WinRT, shown as "SimplySec": the app id is registered for
+/// the current user (HKCU\Software\Classes\AppUserModelId, as unpackaged apps do). If Windows
+/// won't show it under that id, v2's PowerShell app id is used instead (no PowerShell runs).
+/// </summary>
 public static class Toast
 {
-    private const string AppId = @"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe";
+    public const string AppId = "SimplySec.DailyCheck";
+    private const string PowerShellAppId = @"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe";
 
-    private const string Script = """
-        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-        [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
-        $doc = New-Object Windows.Data.Xml.Dom.XmlDocument
-        $doc.LoadXml($P.xml)
-        $toast = New-Object Windows.UI.Notifications.ToastNotification $doc
-        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($P.app).Show($toast)
-        'null'
-        """;
+    /// <summary>Register (or refresh) the app id's display name and icon for this user.</summary>
+    public static void Register()
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"Software\Classes\AppUserModelId\{AppId}");
+        key.SetValue("DisplayName", "SimplySec");
+        var exe = Elevation.CommandFor([], gui: true).Exe;
+        if (File.Exists(exe))
+        {
+            key.SetValue("IconUri", exe);
+        }
+    }
+
+    private static void ShowAs(string appId, string xml)
+    {
+        var doc = new global::Windows.Data.Xml.Dom.XmlDocument();
+        doc.LoadXml(xml);
+        var notifier = global::Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier(appId);
+        notifier.Show(new global::Windows.UI.Notifications.ToastNotification(doc));
+        // Turned off for this app in Settings: report it, so the caller can try the other id.
+        if (notifier.Setting != global::Windows.UI.Notifications.NotificationSetting.Enabled)
+        {
+            throw new InvalidOperationException($"notifications for {appId}: {notifier.Setting}");
+        }
+    }
 
     private static string Esc(string s) => s.Replace("&", "&amp;", StringComparison.Ordinal).Replace(">", "&gt;", StringComparison.Ordinal).Replace("<", "&lt;", StringComparison.Ordinal);
 
@@ -557,9 +658,20 @@ public static class Toast
 
     public static bool Show(string title, List<string> lines)
     {
+        var xml = ToastXml(title, lines);
         try
         {
-            Runner.PowerShellJson(Script, new JsonObject { ["xml"] = ToastXml(title, lines), ["app"] = AppId }, timeout: 30);
+            Register();
+            ShowAs(AppId, xml);
+            return true;
+        }
+        catch (Exception exc)
+        {
+            Log.Information("toast as SimplySec failed ({Type} 0x{HResult:X8} {Error}); using the PowerShell app id", exc.GetType().Name, exc.HResult, exc.Message);
+        }
+        try
+        {
+            ShowAs(PowerShellAppId, xml);
             return true;
         }
         catch (Exception exc)

@@ -157,10 +157,17 @@ public static class Collector
         return env;
     }
 
+    /// <summary>
+    /// The facts, read natively. SIMPLYSEC_FACTS=ps1 runs v2's facts.ps1 instead (kept for
+    /// comparisons until the cutover; the native reader is checked against it by a test).
+    /// </summary>
     private static JsonObject Facts()
     {
-        var data = Runner.PowerShellFile(Paths.FactsScript, timeout: 180);
-        return data as JsonObject ?? [];
+        if (Environment.GetEnvironmentVariable("SIMPLYSEC_FACTS") == "ps1")
+        {
+            return Runner.PowerShellFile(Paths.FactsScript, timeout: 180) as JsonObject ?? [];
+        }
+        return NativeFacts.Collect();
     }
 
     public static RawScan Collect(Action<string>? progress = null)

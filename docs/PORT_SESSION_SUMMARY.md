@@ -13,8 +13,9 @@ runs; it is the reference ("oracle") for the port.
 | P2 Checks, impact, analysis | done | `53d6602` |
 | P3 Actions, journal, history, engine apply/undo, daily check, LAN/router, report | done | `1c5c6c5` |
 | P4 Windows layer + CLI | **done** 2026-11-03: smoke run, live parity gate 3/3, Windows tests, elevated checks | `25633f8`, `d2a5c3f` |
-| P5 WPF app | **in progress**: app written, builds, renders every page and dialog in light and dark (snapshots), real scan works in the window, view-model tests pass; **manual checklist with the user still to do** | not committed yet |
-| P6 remove PowerShell, P7 packaging, P8 cutover | not started | |
+| P5 WPF app | **done**: manual checklist passed with the user | `c31d50b` |
+| P6 remove PowerShell | **in progress**: native facts, usage, setters, network category and toast written; facts and usage match the PowerShell versions on this PC (non-elevated); live parity 3/3; no powershell.exe during a scan; **elevated checks with the user still to do** | not committed yet |
+| P7 packaging, P8 cutover | not started | |
 
 `dotnet test --project tests/SimplySec.App.Tests` → **15 pass** (about 4 s).
 
@@ -119,10 +120,54 @@ Shared data still lives in the Python tree, linked by the C# projects:
 - Ports "Review…" and the double-click details;
 - the device "Trusted" checkbox and jump-to-card.
 
+## P6 (2026-11-03)
+
+**Facts:** `NativeFacts` (`src/SimplySec.Windows/NativeFacts.cs`, with `Wmi.cs` and `PsRegistry`) reads the same CIM providers, registry values, netapi32 and COM objects as `facts.ps1`, and writes the same JSON. That includes PowerShell's quirks the checks may see:
+- DWORDs are signed.
+- A list fact with one entry is that entry, and with none it is `{}` (AutomationNull).
+- DNS servers are listed IPv6 first.
+- The hotfix tie-break uses .NET Framework 4.0's unstable quicksort (`LegacyQuickSort`), which Windows PowerShell 5.1's `Sort-Object` uses.
+- `Get-SmbServerConfiguration` is the class method `GetConfiguration()`, not an instance query.
+
+`SIMPLYSEC_FACTS=ps1` still runs the script, for comparisons until the cutover.
+
+**Measured:**
+- Facts: about 0.8 s instead of about 5.6 s.
+- `scan --json`: 1.1–1.3 s (Python v2: about 16 s).
+
+**Deviations (documented, no effect on the analysis):**
+- `network.ip` keeps the IP-interface order. It's only ever looked up by interface index.
+- Last logons have whole seconds (netapi32) instead of ticks.
+- Error texts differ; statuses don't.
+
+`compare_live.py` normalises the first two.
+
+**Usage, setters, toasts:**
+- `Usage.Extra()` reads CIM: SMB mappings and sessions, and printers. Last logons come from netapi32.
+- The setters call CIM methods:
+  - `MSFT_SmbServerConfiguration.SetConfiguration`;
+  - `MSFT_MpPreference.Set` and `MSFT_MpSignature.Update`;
+  - `Win32_NetworkAdapterConfiguration.SetTcpipNetbios`;
+  - `SystemRestore.CreateRestorePoint`.
+- The network category is an `MSFT_NetConnectionProfile` Put.
+- Toasts use WinRT directly with the app id `SimplySec.DailyCheck`, registered under `HKCU\Software\Classes\AppUserModelId`. If Windows refuses that id, they fall back to v2's PowerShell app id; no PowerShell process starts either way.
+- Hidden `monitor --test-notification` shows a sample toast.
+
+**Tests (`NativeFactsTests`, live, read-only):**
+- facts vs `facts.ps1`;
+- usage vs the old script (kept as `Usage.ReferenceScript`);
+- a full `Collector.Collect()` starts no `powershell.exe` (`Runner.Started` records every child process);
+- the PowerShell sort and unwrap rules.
+
+**Still to do (P6 gate, needs the user):**
+- `NativeFactsTests` from an elevated prompt (admin-only facts);
+- in the app as administrator, a fix and undo for each new setter: NetBIOS off, ransomware protection, mark network Private, a restore point;
+- confirm the test notification shows as "SimplySec".
+
 ## Next steps
 
-1. Run the P5 manual checklist with the user, fix what it finds, then commit P5.
-2. P6: replace `facts.ps1` and the PowerShell setters/usage/toasts with native code.
+1. Finish the P6 elevated checks with the user, then commit P6.
+2. P7: tester packaging (self-contained publish, one folder, zip, re-point an existing Python daily task).
 
 **After cutover (not for parity):** v2 de-duplicates listeners by (protocol, address, port) and keeps the first PID. UDP 5353 is shared by several programs (svchost, adb, NVIDIA…), so the owner, and with it the findings and score (31 vs 33 here), changes from scan to scan.
 

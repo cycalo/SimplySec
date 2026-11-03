@@ -72,7 +72,7 @@ public sealed class Cli(CliHost host)
         ["undo"] = (["--all", "--rules", "--yes", "--elevate"], ["--batch"], ["--change"], [], 0),
         ["changes"] = ([], [], [], [], 0),
         ["history"] = ([], ["--limit"], [], [], 0),
-        ["monitor"] = (["--run", "--disable", "--elevate"], [], [], ["--enable"], 0),
+        ["monitor"] = (["--run", "--disable", "--elevate", "--test-notification"], [], [], ["--enable"], 0),
         ["report"] = (["--html"], [], [], [], 1),
     };
 
@@ -720,6 +720,13 @@ public sealed class Cli(CliHost host)
         if (a.Has("--run"))
         {
             return DailyCheck.RunOnce(host.Engine(), host.Lan(), (t, l) => host.Notify(t, l));
+        }
+        if (a.Has("--test-notification"))
+        {
+            // Hidden: show what a daily-check notification looks like.
+            var shown = host.Notify("SimplySec: test notification", ["This is how the daily check tells you that something got worse."]);
+            Out(shown ? "Notification shown." : "Could not show a notification (see the log).");
+            return shown ? ExitOk : ExitFail;
         }
         var enable = a.Value("--enable");
         if (enable is not null || a.Has("--disable"))
