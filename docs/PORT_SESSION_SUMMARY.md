@@ -14,14 +14,15 @@ runs; it is the reference ("oracle") for the port.
 | P3 Actions, journal, history, engine apply/undo, daily check, LAN/router, report | done | `1c5c6c5` |
 | P4 Windows layer + CLI | **done** 2026-11-03: smoke run, live parity gate 3/3, Windows tests, elevated checks | `25633f8`, `d2a5c3f` |
 | P5 WPF app | **done**: manual checklist passed with the user | `c31d50b` |
-| P6 remove PowerShell | **in progress**: native facts, usage, setters, network category and toast written; facts and usage match the PowerShell versions on this PC (non-elevated); live parity 3/3; no powershell.exe during a scan; **elevated checks with the user still to do** | not committed yet |
-| P7 packaging, P8 cutover | not started | |
+| P6 remove PowerShell | **done**: elevated facts test, toast as "SimplySec", fix and undo of each new setter checked with the user (the restore point itself unconfirmed: Windows may skip one within 24 h) | `c65d43f` |
+| P7 tester packaging | **in progress**: `scripts/build.ps1` builds and tests the zip; fresh unzip runs read-only; Defender clean; **elevated checks with the user still to do** (see the P7 section) | not committed yet |
+| P8 cutover | not started | |
 
-`dotnet test --project tests/SimplySec.App.Tests` → **15 pass** (about 4 s).
+`dotnet test --project tests/SimplySec.App.Tests` → **17 pass** (about 4 s).
 
-`dotnet test --project tests/SimplySec.Windows.Tests` → **22 pass, 2 skipped** (admin, opt-in), about 2 s.
+`dotnet test --project tests/SimplySec.Windows.Tests` → **28 pass, 2 skipped** (admin, opt-in), about 10 s.
 
-`dotnet test --project tests/SimplySec.Core.Tests` → **51 tests pass** (about 25 s). They include:
+`dotnet test --project tests/SimplySec.Core.Tests` → **53 tests pass** (about 25 s). They include:
 - 2,545 exposure cases plus the PC fixture;
 - 71 analyze scenarios;
 - more than 1,000 fix plans;
@@ -159,15 +160,22 @@ Shared data still lives in the Python tree, linked by the C# projects:
 - a full `Collector.Collect()` starts no `powershell.exe` (`Runner.Started` records every child process);
 - the PowerShell sort and unwrap rules.
 
-**Still to do (P6 gate, needs the user):**
-- `NativeFactsTests` from an elevated prompt (admin-only facts);
-- in the app as administrator, a fix and undo for each new setter: NetBIOS off, ransomware protection, mark network Private, a restore point;
-- confirm the test notification shows as "SimplySec".
+**Checked with the user (P6 gate):** `NativeFactsTests` elevated 5/5; the test notification shows as "SimplySec"; fix and undo of NetBIOS off, ransomware protection and mark-Private. The NetBIOS undo on an adapter without DHCP (Tailscale) failed with `SetTcpipNetbios` 100, as in v2; it now writes `NetbiosOptions=0` under `NetBT\Parameters\Interfaces\Tcpip_{guid}` instead.
+
+## P7 (2026-11-03)
+
+- **`scripts/build.ps1`** (Windows PowerShell 5.1 or 7): runs the three test suites (`-SkipTests` skips them), publishes `SimplySec.App` and `SimplySec.Cli` self-contained win-x64 with ReadyToRun into `dist\SimplySec-<ver>-win64\`, drops `.pdb`s, adds `packaging\win64\README.txt` (tester readme), checks `simplysec-cli --version`, runs the signing hook (a no-op that names the files), zips to `dist\SimplySec-<ver>-win64.zip` with a `.sha256`, and with `-DefenderScan` scans the zip with `MpCmdRun`. The v2 PyInstaller script is now `scripts/build_v2.ps1`.
+- **Result:** 77.6 MB zip, 266 files; both exes carry version 3.0.0 and the icon; Defender found nothing. From a fresh unzip (not elevated) `scan` takes 1.5 s and the GUI renders every page (`--snapshot`).
+- `facts.ps1` is no longer published (`CopyToPublishDirectory="Never"`); it stays in the build output for `SIMPLYSEC_FACTS=ps1` and the facts test.
+- **Re-pointing a v2 daily task:** `DailyCheck.ParseTask` reads the command, arguments and time from the task XML; `PointsElsewhere` compares them with this copy (`Scheduler.Command()`). Settings shows a banner ("Use this copy for the daily check") that re-creates the task at the same time through `DailyCheck.Enable`, which is journaled: undo restores the old task's XML. New `monitor --status` prints the task and the command to re-point it.
+- `NativeTests` and `NativeFactsTests` share an xUnit collection: `ScanStartsNoPowerShell` records every program started, so PowerShell-running tests can't run beside it (it failed once in a Release run).
+
+**Still to do (P7 gate, needs the user):** from an Explorer-extracted copy of the zip: elevated fix and undo; create a v2 daily task, re-point it from Settings, run it with `schtasks /Run` (no window, a monitor scan in History), `SimplySec.exe monitor --test-notification` shows as "SimplySec"; then remove the task. VirusTotal upload is the user's call.
 
 ## Next steps
 
-1. Finish the P6 elevated checks with the user, then commit P6.
-2. P7: tester packaging (self-contained publish, one folder, zip, re-point an existing Python daily task).
+1. Finish the P7 checks with the user, then commit P7.
+2. P8: cutover (see PORT_PLAN.md); ask before merging to `main`.
 
 **After cutover (not for parity):** v2 de-duplicates listeners by (protocol, address, port) and keeps the first PID. UDP 5353 is shared by several programs (svchost, adb, NVIDIA…), so the owner, and with it the findings and score (31 vs 33 here), changes from scan to scan.
 

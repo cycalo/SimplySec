@@ -20,6 +20,9 @@ public sealed class SettingsPage : PageView
     private readonly ComboBox _hour = new() { Width = 72 };
     private readonly ComboBox _minute = new() { Width = 72 };
     private readonly TextBlock _dailyStatus = Text("", TextStyle.Dim);
+    private readonly TextBlock _repointText = Text();
+    private readonly Border _repoint;
+    private string _repointTime = "12:00";
     private readonly StackPanel _nets = VStack(8);
     private readonly StackPanel _accepted = VStack(8);
 
@@ -27,6 +30,14 @@ public sealed class SettingsPage : PageView
 
     public SettingsPage(MainViewModel vm) : base(vm, "Settings")
     {
+        var repoint = VStack(8);
+        repoint.Children.Add(_repointText);
+        var update = Button("Use this copy for the daily check", Repoint);
+        update.HorizontalAlignment = HorizontalAlignment.Left;
+        repoint.Children.Add(update);
+        _repoint = Banner(repoint);
+        _repoint.Visibility = Visibility.Collapsed;
+
         var admin = VStack(8);
         admin.Children.Add(Text("Administrator", TextStyle.SectionTitle));
         admin.Children.Add(_adminText);
@@ -64,6 +75,7 @@ public sealed class SettingsPage : PageView
         Body.Children.Add(Card(data));
 
         vm.ScanFinished += _ => Refresh();
+        vm.ChangesUpdated += Refresh;
         Refresh();
     }
 
@@ -93,8 +105,40 @@ public sealed class SettingsPage : PageView
         row.Children.Add(Button("Apply", () => Vm.SetDailyCheck(_daily.IsChecked == true, DailyTime)));
         dl.Children.Add(row);
         dl.Children.Add(_dailyStatus);
+        dl.Children.Add(_repoint);
         return dl;
     }
+
+    /// <summary>
+    /// Offer to re-point a daily-check task that runs another program (the Python v2 build, or a
+    /// folder that was moved): it would stop working once that copy is deleted.
+    /// </summary>
+    private async Task CheckTaskAsync()
+    {
+        (DailyCheck.TaskAction Task, bool Elsewhere)? state;
+        try
+        {
+            state = await Task.Run(() => Vm.Services.DailyTask(Vm.Engine));
+        }
+        catch (Exception exc)
+        {
+            Serilog.Log.Warning("could not read the daily-check task: {Error}", exc.Message);
+            return;
+        }
+        if (state is not { Elsewhere: true } s)
+        {
+            _repoint.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _repointTime = s.Task.Time.Length > 0 ? s.Task.Time : DailyTime;
+        _repointText.Text = $"The daily check still runs another copy of SimplySec:\n{s.Task.Command}\nIt stops working once that copy is deleted. Point it to this copy (same time, {_repointTime}); this is recorded on the Changes page like any other change.";
+        _repoint.Visibility = Visibility.Visible;
+    }
+
+    public bool RepointOffered => _repoint.Visibility == Visibility.Visible;
+
+    /// <summary>Re-create the task for this copy (journaled; the old task is what Undo restores).</summary>
+    public void Repoint() => Vm.SetDailyCheck(true, _repointTime);
 
     public string DailyTime => $"{_hour.SelectedItem ?? "12"}:{_minute.SelectedItem ?? "00"}";
 
@@ -121,6 +165,7 @@ public sealed class SettingsPage : PageView
         FillNetworks();
         var settings = DailySettings();
         _dailyStatus.Text = Js.Truthy(settings["enabled"]) ? $"On, daily at {Js.Str(settings["time"])}." : "Off.";
+        _ = CheckTaskAsync();
 
         _accepted.Children.Clear();
         _accepted.Children.Add(Text("Accepted risks (Keep)", TextStyle.SectionTitle));

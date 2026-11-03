@@ -27,6 +27,8 @@ public sealed class CliHost
     public Func<string, List<string>, bool> Notify { get; init; } = Toast.Show;
     public Func<IReadOnlyList<string>, (Elevation.ElevatedStatus, int)> RunElevated { get; init; } = a => Elevation.RunElevatedAndWait(a);
     public Func<string> JournalPath { get; init; } = () => Paths.JournalPath;
+    /// <summary>What the daily-check task should run: this copy of SimplySec.</summary>
+    public Func<(string Exe, string Args)> DailyTarget { get; init; } = () => Scheduler.Command();
 }
 
 /// <summary>
@@ -72,7 +74,7 @@ public sealed class Cli(CliHost host)
         ["undo"] = (["--all", "--rules", "--yes", "--elevate"], ["--batch"], ["--change"], [], 0),
         ["changes"] = ([], [], [], [], 0),
         ["history"] = ([], ["--limit"], [], [], 0),
-        ["monitor"] = (["--run", "--disable", "--elevate", "--test-notification"], [], [], ["--enable"], 0),
+        ["monitor"] = (["--run", "--disable", "--elevate", "--test-notification", "--status"], [], [], ["--enable"], 0),
         ["report"] = (["--html"], [], [], [], 1),
     };
 
@@ -399,7 +401,9 @@ public sealed class Cli(CliHost host)
     private int RelaunchElevated()
     {
         var argv = _argv.Where(x => x != "--elevate").ToList();
-        if (!argv.Contains("--yes"))
+        // v2 always added --yes, which 'monitor' rejects: 'monitor --enable --elevate' failed silently.
+        var command = argv.FirstOrDefault(x => Spec.ContainsKey(x));
+        if (!argv.Contains("--yes") && command is not null && Spec[command].Flags.Contains("--yes"))
         {
             argv.Add("--yes");
         }
@@ -751,8 +755,32 @@ public sealed class Cli(CliHost host)
             Out(removed ? "Daily check removed." : "Could not remove the daily check; see 'simplysec changes'.");
             return removed ? ExitOk : ExitFail;
         }
-        Out("Use --run, --enable [HH:MM] or --disable.");
+        if (a.Has("--status"))
+        {
+            return MonitorStatus();
+        }
+        Out("Use --run, --enable [HH:MM], --disable or --status.");
         return ExitUsage;
+    }
+
+    private int MonitorStatus()
+    {
+        var task = DailyCheck.CurrentTask(host.Engine());
+        if (task is null)
+        {
+            Out("Daily check: off.");
+            return ExitOk;
+        }
+        Out(task.Time.Length > 0 ? $"Daily check: on, daily at {task.Time}." : "Daily check: on.");
+        Out($"  Runs: \"{task.Command}\" {task.Arguments}");
+        var (exe, args) = host.DailyTarget();
+        if (DailyCheck.PointsElsewhere(task, exe, args))
+        {
+            var time = task.Time.Length > 0 ? task.Time : "12:00";
+            Out("  This is not this copy of SimplySec (an older version, or a folder that was moved).");
+            Out($"  To run this copy instead: simplysec-cli monitor --enable {time} --elevate");
+        }
+        return ExitOk;
     }
 
     private int ReportCmd(Args a)

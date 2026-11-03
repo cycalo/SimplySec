@@ -6,6 +6,7 @@
     <AssemblyName>simplysec-cli</AssemblyName>
     <RootNamespace>SimplySec.Cli</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\simplysec\resources\simplysec.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <Description>SimplySec command line</Description>

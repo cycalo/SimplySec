@@ -4,6 +4,7 @@ using SimplySec.Windows.Interop;
 namespace SimplySec.Windows.Tests;
 
 /// <summary>Native interop on this PC (read-only): struct layouts and psutil-equivalent behaviour.</summary>
+[Collection("os")]
 public class NativeTests
 {
     [Theory]

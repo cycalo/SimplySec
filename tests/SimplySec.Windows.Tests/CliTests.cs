@@ -33,7 +33,10 @@ public sealed class CliTests : IDisposable
         Notify = (_, _) => true,
         Lan = () => throw new InvalidOperationException("no network in tests"),
         RunElevated = _ => throw new InvalidOperationException("no elevation in tests"),
+        DailyTarget = () => (ThisCopy, "monitor --run"),
     });
+
+    private const string ThisCopy = "C:/Apps/SimplySec/SimplySec.exe";
 
     private Cli FakeCli(bool admin = false) => MakeCli(TestEngines.Make(_tmp, admin, Raw()).Engine, admin);
 
@@ -84,6 +87,54 @@ public sealed class CliTests : IDisposable
         Assert.Contains(
             "argument command: invalid choice: 'bogus' (choose from 'scan', 'fix', 'keep', 'undo', 'changes', 'history', 'monitor', 'report')",
             _err.ToString(), StringComparison.Ordinal);
+    }
+
+    private static string TaskXml(string command, string time) =>
+        "<Task xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'><Triggers><CalendarTrigger><StartBoundary>2026-11-01T"
+        + time + ":00</StartBoundary></CalendarTrigger></Triggers><Actions><Exec><Command>" + command
+        + "</Command><Arguments>monitor --run</Arguments></Exec></Actions></Task>";
+
+    [Fact]
+    public void ElevateAddsYesOnlyWhereAccepted()
+    {
+        var engine = TestEngines.Make(_tmp, false, Raw()).Engine;
+        var seen = new List<string[]>();
+        CliHost Host() => new()
+        {
+            Engine = () => engine,
+            IsAdmin = () => false,
+            ReadLine = () => null,
+            Out = _out,
+            Err = _err,
+            JournalPath = () => _tmp.File("data/simplysec.db"),
+            RunElevated = a => { seen.Add([.. a]); return (Elevation.ElevatedStatus.Finished, 0); },
+        };
+        Assert.Equal(Cli.ExitOk, new Cli(Host()).Run(["monitor", "--enable", "07:05", "--elevate"]));
+        Assert.Equal(Cli.ExitOk, new Cli(Host()).Run(["undo", "--all", "--elevate"]));
+        Assert.Equal(["monitor", "--enable", "07:05"], seen[0]);
+        Assert.Equal(["undo", "--all", "--yes"], seen[1]);
+    }
+
+    [Fact]
+    public void MonitorStatusPointsOutAnOlderCopy()
+    {
+        var (engine, adapters) = TestEngines.Make(_tmp, admin: false, Raw());
+        var tasks = ((FakeScheduler)adapters.Scheduler!).Tasks;
+        var cli = MakeCli(engine, admin: false);
+        Assert.Equal(Cli.ExitOk, cli.Run(["monitor", "--status"]));
+        Assert.Equal("Daily check: off.", _out.ToString().Trim());
+
+        tasks[DailyCheck.TaskName] = TaskXml("C:/Old/SimplySec/SimplySec.exe", "07:05");
+        _out.GetStringBuilder().Clear();
+        Assert.Equal(Cli.ExitOk, cli.Run(["monitor", "--status"]));
+        var text = _out.ToString();
+        Assert.Contains("Daily check: on, daily at 07:05.", text, StringComparison.Ordinal);
+        Assert.Contains("simplysec-cli monitor --enable 07:05 --elevate", text, StringComparison.Ordinal);
+
+        tasks[DailyCheck.TaskName] = TaskXml(ThisCopy, "07:05");
+        _out.GetStringBuilder().Clear();
+        cli.Run(["monitor", "--status"]);
+        Assert.DoesNotContain("--enable", _out.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

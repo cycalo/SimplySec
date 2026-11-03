@@ -7,6 +7,9 @@ namespace SimplySec.Windows.Tests;
 /// P6 gate, per fact: the native collector gives what facts.ps1 gives on this PC (read-only).
 /// Error texts may differ; statuses and values may not.
 /// </summary>
+// Same collection as NativeTests: ScanStartsNoPowerShell watches every program started, so tests that
+// run PowerShell must not run alongside it.
+[Collection("os")]
 public class NativeFactsTests(ITestOutputHelper output)
 {
     private static string Script => Path.Combine(Golden.RepoRoot, "src", "simplysec", "windows", "scripts", "facts.ps1");

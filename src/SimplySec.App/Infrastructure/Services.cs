@@ -32,6 +32,11 @@ public interface IAppServices
     void OpenPath(string path);
     void OpenSettings(string target);
     void WriteReport(string path, ScanResult result, ScanEngine engine);
+    /// <summary>
+    /// The daily-check task as scheduled now (null: none), and whether it runs another program
+    /// than this copy of SimplySec (the Python v2 build, or a moved folder).
+    /// </summary>
+    (DailyCheck.TaskAction Task, bool Elsewhere)? DailyTask(ScanEngine engine);
 }
 
 public sealed class WindowsAppServices(Func<ScanEngine>? engine = null) : IAppServices
@@ -67,6 +72,16 @@ public sealed class WindowsAppServices(Func<ScanEngine>? engine = null) : IAppSe
 
     public void WriteReport(string path, ScanResult result, ScanEngine engine) =>
         Commands.Cli.WriteReport(path, result, engine, Paths.JournalPath);
+
+    public (DailyCheck.TaskAction Task, bool Elsewhere)? DailyTask(ScanEngine engine)
+    {
+        if (DailyCheck.CurrentTask(engine) is not { } task)
+        {
+            return null;
+        }
+        var (exe, args) = Scheduler.Command();
+        return (task, DailyCheck.PointsElsewhere(task, exe, args));
+    }
 }
 
 /// <summary>One applied change as shown in the result dialog.</summary>

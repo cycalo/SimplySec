@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using SimplySec.Core.Checks;
 using SimplySec.Core.Compat;
 using SimplySec.Core.Lan;
@@ -98,6 +100,63 @@ public static partial class DailyCheck
         return 0;
     }
 
+    /// <summary>What the scheduled daily-check task runs, and at what time of day.</summary>
+    public sealed record TaskAction(string Command, string Arguments, string Time);
+
+    /// <summary>Read the program, arguments and time from the task's XML (<c>schtasks /Query /XML</c>).</summary>
+    public static TaskAction? ParseTask(string? xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+        {
+            return null;
+        }
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(xml.Trim().TrimStart((char)0xFEFF));
+        }
+        catch (XmlException)
+        {
+            return null;
+        }
+        XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+        var exec = doc.Descendants(ns + "Exec").FirstOrDefault();
+        if (exec is null)
+        {
+            return null;
+        }
+        var start = (string?)doc.Descendants(ns + "StartBoundary").FirstOrDefault() ?? "";
+        var t = start.IndexOf('T', StringComparison.Ordinal);
+        var time = t >= 0 && start.Length >= t + 6 ? start.Substring(t + 1, 5) : "";
+        var command = ((string?)exec.Element(ns + "Command") ?? "").Trim().Trim('"');
+        return new TaskAction(command, ((string?)exec.Element(ns + "Arguments") ?? "").Trim(), time);
+    }
+
+    /// <summary>
+    /// True when the task runs something other than this copy of SimplySec: the Python v2 build, or
+    /// a folder that was moved or replaced. Such a task stops working once the old folder is gone.
+    /// </summary>
+    public static bool PointsElsewhere(TaskAction task, string exe, string arguments)
+    {
+        static string Full(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path.Trim().Trim('"'));
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return path;
+            }
+        }
+        return !string.Equals(Full(task.Command), Full(exe), StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(task.Arguments, arguments.Trim(), StringComparison.Ordinal);
+    }
+
+    /// <summary>The daily-check task as Task Scheduler has it now (null: none, or it can't be read).</summary>
+    public static TaskAction? CurrentTask(ScanEngine engine) =>
+        engine.Adapters.Scheduler is { } sched ? ParseTask(sched.ExportXml(TaskName)) : null;
+
     public static ActionSpec ScheduleSpec(string time) => new("task.schedule",
         new JsonObject { ["name"] = TaskName, ["time"] = time },
         $"Create the scheduled task '{TaskName}' (daily at {time}, read-only).");
@@ -117,7 +176,11 @@ public static partial class DailyCheck
         var plan = new Plan();
         plan.Items.Add(new PlannedFix { Fix = fix, Params = new JsonObject { ["time"] = time }, Specs = [ScheduleSpec(time)], Warnings = [] });
         var result = engine.Apply(plan);
-        engine.History.SetSetting(Setting, new JsonObject { ["enabled"] = true, ["time"] = time });
+        // v2 saved "on" even when the task could not be created, so Settings showed a check that never ran.
+        if (result.Ok)
+        {
+            engine.History.SetSetting(Setting, new JsonObject { ["enabled"] = true, ["time"] = time });
+        }
         return result;
     }
 

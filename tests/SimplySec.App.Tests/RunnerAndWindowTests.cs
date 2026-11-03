@@ -100,6 +100,41 @@ public sealed class WindowTests : IDisposable
         });
     }
 
+    private static void PumpUntil(Func<bool> done)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!done() && DateTime.UtcNow < deadline)
+        {
+            UiThread.DoEvents();
+            Thread.Sleep(10);
+        }
+    }
+
+    [Fact]
+    public void SettingsOffersToRepointAnOlderDailyCheck()
+    {
+        var (engine, _) = TestEngines.Make(_tmp, false);
+        var old = new DailyCheck.TaskAction("C:/Old/SimplySec/SimplySec.exe", "monitor --run", "07:05");
+        var services = new FakeServices(_tmp, engine, false) { ScheduledTask = (old, true) };
+        UiThread.Run(() =>
+        {
+            var vm = new MainViewModel(services, new FakeDialogs(),
+                new BackgroundRunner(new System.Windows.Threading.DispatcherSynchronizationContext(UiThread.Dispatcher)));
+            var page = new SettingsPage(vm);
+            PumpUntil(() => page.RepointOffered);
+            Assert.True(page.RepointOffered);
+
+            page.Repoint();
+            PumpUntil(() => services.Elevated.Count > 0 && !vm.IsBusy);
+            Assert.Equal(["monitor", "--enable", "07:05"], services.Elevated.Single());
+
+            services.ScheduledTask = (old, false);
+            page.Refresh();
+            PumpUntil(() => !page.RepointOffered);
+            Assert.False(page.RepointOffered);
+        });
+    }
+
     [Fact]
     public void MouseWheelScrollsThePage()
     {

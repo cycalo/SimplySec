@@ -45,6 +45,47 @@ public class MonitorHistoryTests
                 ScanD(90, devices: [new JsonObject { ["mac"] = "AA" }, new JsonObject { ["mac"] = "BB", ["name"] = "Unknown camera" }])));
     }
 
+    /// <summary>A daily-check task as v2's frozen build created it (trimmed to what is read).</summary>
+    private const string V2TaskXml = """
+        <?xml version="1.0" encoding="UTF-16"?>
+        <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+          <RegistrationInfo><Author>SimplySec</Author></RegistrationInfo>
+          <Triggers><CalendarTrigger><StartBoundary>2026-10-01T18:30:00</StartBoundary></CalendarTrigger></Triggers>
+          <Actions Context="Author"><Exec><Command>C:\Users\Tester\Downloads\SimplySec\SimplySec.exe</Command><Arguments>monitor --run</Arguments></Exec></Actions>
+        </Task>
+        """;
+
+    [Fact]
+    public void ReadsTheTaskAndSpotsAnotherCopy()
+    {
+        var task = DailyCheck.ParseTask("\uFEFF" + V2TaskXml + "\r\n")!;
+        Assert.Equal(@"C:\Users\Tester\Downloads\SimplySec\SimplySec.exe", task.Command);
+        Assert.Equal("monitor --run", task.Arguments);
+        Assert.Equal("18:30", task.Time);
+        Assert.True(DailyCheck.PointsElsewhere(task, @"D:\Apps\SimplySec-3.0.0-win64\SimplySec.exe", "monitor --run"));
+        Assert.False(DailyCheck.PointsElsewhere(task, @"c:\users\tester\downloads\simplysec\SIMPLYSEC.EXE", "monitor --run"));
+        Assert.False(DailyCheck.PointsElsewhere(task with { Command = "\"" + task.Command + "\"" }, task.Command, "monitor --run"));
+        // v2 run from source: pythonw.exe -m simplysec monitor --run
+        Assert.True(DailyCheck.PointsElsewhere(task with { Arguments = "-m simplysec monitor --run" }, task.Command, "monitor --run"));
+        Assert.Null(DailyCheck.ParseTask(null));
+        Assert.Null(DailyCheck.ParseTask("<Task>SimplySec 12:00</Task>"));
+        Assert.Null(DailyCheck.ParseTask("not xml"));
+    }
+
+    [Fact]
+    public void RepointingAV2TaskIsJournaledAndUndoable()
+    {
+        using var tmp = new TempDir();
+        var (engine, a) = TestEngines.Make(tmp);
+        var sched = (FakeScheduler)a.Scheduler!;
+        sched.Tasks[DailyCheck.TaskName] = V2TaskXml;
+        Assert.Equal("18:30", DailyCheck.CurrentTask(engine)!.Time);
+        Assert.True(DailyCheck.Enable(engine, "18:30").Ok);
+        Assert.EndsWith("18:30</Task>", sched.Tasks[DailyCheck.TaskName], StringComparison.Ordinal);
+        Assert.True(engine.Undo(changeIds: [DailyCheck.ActiveChange(engine)!.Id]).All(o => o.Ok));
+        Assert.Equal(V2TaskXml, sched.Tasks[DailyCheck.TaskName]);
+    }
+
     [Fact]
     public void EnableMoveAndDisableAreJournaled()
     {

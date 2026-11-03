@@ -115,6 +115,8 @@ public sealed class FakeServices(TempDir tmp, ScanEngine engine, bool admin) : I
     public void OpenPath(string path) => Opened.Add(path);
     public void OpenSettings(string target) => Opened.Add(target);
     public void WriteReport(string path, ScanResult result, ScanEngine engine) => File.WriteAllText(path, "report");
+    public (DailyCheck.TaskAction Task, bool Elsewhere)? ScheduledTask { get; set; }
+    public (DailyCheck.TaskAction Task, bool Elsewhere)? DailyTask(ScanEngine engine) => ScheduledTask;
 }
 
 /// <summary>One STA thread with a running dispatcher and the app's resources, shared by the window tests.</summary>
