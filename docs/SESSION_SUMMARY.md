@@ -31,7 +31,7 @@ Pick up here; the open work is in [TODO.md](TODO.md). How the program works is i
 | P5 WPF app (WPF-UI); manual checklist passed with the user | `c31d50b` |
 | P6 no PowerShell: native facts, usage, setters, toasts | `c65d43f` |
 | P7 tester packaging (`scripts/build.ps1`), daily-task re-point, fixes | `20f3905` |
-| P8 cutover: Python removed, resources moved, docs rewritten | the commit after `20f3905` |
+| P8 cutover: Python removed, resources moved, docs rewritten | `a14b10b` |
 
 Parity was checked three ways: the golden corpus exported from Python (thousands of exposure
 cases, 71 analysis scenarios, more than 1,000 fix plans, primitives, storage), live side-by-side
