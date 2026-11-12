@@ -6,6 +6,7 @@ Scanning is read-only. Every fix is shown to you first, needs administrator perm
 recorded on the Changes page, and can be undone there.
 
 Needs Windows 10 (1809 or later) or Windows 11, 64-bit. Nothing else to install.
+This folder already contains the .NET runtime, so it runs on a PC where .NET was never installed.
 
 
 Start
